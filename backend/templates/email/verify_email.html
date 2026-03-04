@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="text-align: center; padding: 20px 0;">
+    <h1 style="color: #333;">Welcome to Accura</h1>
+  </div>
+  <div style="padding: 20px; background: #f9f9f9; border-radius: 8px;">
+    <p>Hi <strong>{{ username }}</strong>,</p>
+    <p>Thank you for signing up! Please verify your email address by clicking the button below:</p>
+    <div style="text-align: center; padding: 20px 0;">
+      <a href="{{ verification_url }}"
+         style="display: inline-block; padding: 12px 32px; background: #4F46E5; color: #fff; text-decoration: none; border-radius: 6px; font-weight: bold;">
+        Verify Email
+      </a>
+    </div>
+    <p style="color: #666; font-size: 14px;">
+      If the button doesn't work, copy and paste this link into your browser:<br>
+      <a href="{{ verification_url }}">{{ verification_url }}</a>
+    </p>
+  </div>
+  <div style="text-align: center; padding: 20px 0; color: #999; font-size: 12px;">
+    <p>&copy; {{ year | default("2026") }} Accura. All rights reserved.</p>
+  </div>
+</body>
+</html>

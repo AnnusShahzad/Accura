@@ -1,0 +1,145 @@
+# =============================================================================
+# Accura – Default YAML Configuration
+# =============================================================================
+# This file is loaded at startup and provides defaults for self-hosted
+# deployments via Docker. Environment variables override values here.
+
+app:
+  name: "Accura"
+  version: "1.0.0"
+  environment: "production"
+  host: "0.0.0.0"
+  port: 8000
+  workers: 4
+  debug: false
+
+branding:
+  company_name: "Accura"
+  logo_url: "/static/logo.png"
+  support_email: "support@accura.ai"
+
+database:
+  host: "postgres"
+  port: 5432
+  name: "accura"
+  user: "accura"
+  password: "changeme"
+  pool_size: 20
+
+redis:
+  url: "redis://redis:6379/0"
+
+jwt:
+  secret: "change-me-in-production"
+  algorithm: "HS256"
+  access_token_expire_minutes: 30
+  refresh_token_expire_days: 30
+
+smtp:
+  host: "smtp.example.com"
+  port: 587
+  user: "noreply@example.com"
+  password: "changeme"
+  from_name: "Accura"
+  from_email: "noreply@example.com"
+  use_tls: true
+
+ai:
+  default_generator_model: "gpt-5.2"
+  default_evaluator_model: "gpt-5.1"
+  default_reprompt_model: "gpt-5.1"
+  providers:
+    openai:
+      api_key: ""
+      base_url: "https://api.openai.com/v1"
+    deepseek:
+      api_key: ""
+      base_url: "https://api.deepseek.com/v1"
+
+  system_prompts:
+    generator: |
+      You are a helpful AI assistant. Provide accurate, detailed, and well-structured responses.
+    evaluator: |
+      You are an expert evaluator. Score the following response on a scale of 0-100 based on
+      accuracy, completeness, clarity, and relevance to the original prompt.
+      Return a JSON object: {"score": <number>, "reasoning": "<brief explanation>"}
+    reprompt: |
+      You are a prompt engineer. The previous response scored below the threshold.
+      Rephrase the following user prompt to elicit a better response from the AI.
+      Keep the original intent but improve clarity and specificity.
+
+evaluation:
+  global_threshold: 75
+  default_max_iterations: 5
+  default_timeout_seconds: 120
+
+rate_limits:
+  basic:
+    requests_per_minute: 10
+    requests_per_day: 100
+    max_tokens_per_request: 4096
+  pro:
+    requests_per_minute: 60
+    requests_per_day: 1000
+    max_tokens_per_request: 16384
+  business:
+    requests_per_minute: 200
+    requests_per_day: 10000
+    max_tokens_per_request: 32768
+
+subscriptions:
+  basic:
+    price_monthly: 0
+    price_yearly: 0
+    features:
+      - "10 requests per minute"
+      - "100 requests per day"
+      - "Community support"
+  pro:
+    price_monthly: 29.99
+    price_yearly: 299.99
+    features:
+      - "60 requests per minute"
+      - "1000 requests per day"
+      - "Priority support"
+      - "BYOK support"
+      - "MCP server integration"
+  business:
+    price_monthly: 99.99
+    price_yearly: 999.99
+    features:
+      - "200 requests per minute"
+      - "10000 requests per day"
+      - "Dedicated support"
+      - "BYOK support"
+      - "MCP server integration"
+      - "Custom branding"
+      - "SSO integration"
+
+search:
+  enabled: true
+  whitelist_domains: []
+  blacklist_domains: []
+  google_api_key: ""
+  google_cse_id: ""
+
+mcp_servers:
+  global: []
+  # - name: "example-mcp"
+  #   url: "https://mcp.example.com"
+  #   api_key: ""
+
+webhooks:
+  slack:
+    enabled: false
+    default_webhook_url: ""
+  teams:
+    enabled: false
+    default_webhook_url: ""
+
+notifications:
+  channels:
+    in_app: true
+    email: true
+    slack: false
+    teams: false

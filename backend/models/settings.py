@@ -2,6 +2,8 @@
 Accura – User Settings Model
 """
 
+import decimal
+
 from piccolo.columns import (
     UUID,
     Boolean,
@@ -24,7 +26,7 @@ class UserSettings(Table, tablename="user_settings"):
     user = UUID(references=User, unique=True, index=True)
 
     # Evaluation
-    global_threshold = Numeric(digits=(5, 2), default=75.00)
+    global_threshold = Numeric(digits=(5, 2), default=decimal.Decimal("75.00"))
     max_iterations = Integer(default=5)
     timeout_seconds = Integer(default=120)
     hide_evaluator_scoring = Boolean(default=False)
@@ -53,4 +55,4 @@ class UserSettings(Table, tablename="user_settings"):
     extra = JSONB(default={})
 
     created_at = Timestamptz(default=TimestamptzNow())
-    updated_at = Timestamptz(default=TimestamptzNow(), auto_update=TimestamptzNow())
+    updated_at = Timestamptz(default=TimestamptzNow())

@@ -2,6 +2,7 @@
 Accura – Notification Routes
 GET    /api/v1/notifications
 PATCH  /api/v1/notifications/<id>/read
+PATCH  /api/v1/notifications/read-all
 """
 
 from __future__ import annotations
@@ -9,6 +10,7 @@ from __future__ import annotations
 from sanic import Blueprint, Request
 
 from middleware.auth_middleware import require_auth
+from models.notification import Notification
 from services.notification_service import get_notifications, mark_as_read
 from utils.responses import success
 
@@ -30,6 +32,17 @@ async def list_notifications(request: Request):
         offset=offset,
     )
     return success(notifications)
+
+
+@bp.patch("/read-all")
+@require_auth
+async def read_all_notifications(request: Request):
+    """Mark all in-app notifications as read for this user."""
+    user_id = str(request.ctx.user["id"])
+    await Notification.update({Notification.is_read: True}).where(
+        (Notification.user == user_id) & (Notification.is_read == False)
+    ).run()
+    return success(message="All notifications marked as read")
 
 
 @bp.patch("/<notification_id:str>/read")

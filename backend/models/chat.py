@@ -2,6 +2,8 @@
 Accura – Chat, Conversation, Agent & Iteration Models
 """
 
+import decimal
+
 from piccolo.columns import (
     UUID,
     Boolean,
@@ -32,12 +34,12 @@ class Conversation(Table, tablename="conversations"):
     timeout_seconds = Integer(null=True, default=None)  # per-chat override
     status = Varchar(length=20, default="active")  # active | completed | archived
     best_response = Text(default="")
-    best_score = Numeric(digits=(5, 2), default=0)
+    best_score = Numeric(digits=(5, 2), default=decimal.Decimal("0"))
     tokens_input = Integer(default=0)
     tokens_output = Integer(default=0)
     metadata = JSONB(default={})
     created_at = Timestamptz(default=TimestamptzNow())
-    updated_at = Timestamptz(default=TimestamptzNow(), auto_update=TimestamptzNow())
+    updated_at = Timestamptz(default=TimestamptzNow())
 
 
 class ChatAgent(Table, tablename="chat_agents"):
@@ -62,7 +64,7 @@ class Iteration(Table, tablename="iterations"):
     iteration_number = Integer(default=1)
     rephrased_prompt = Text(default="")
     response = Text(default="")
-    score = Numeric(digits=(5, 2), default=0)
+    score = Numeric(digits=(5, 2), default=decimal.Decimal("0"))
     evaluation_reasoning = Text(default="")
     tokens_input = Integer(default=0)
     tokens_output = Integer(default=0)

@@ -28,4 +28,4 @@ class UserAPIKey(Table, tablename="user_api_keys"):
     base_url = Text(default="")  # For OpenAI-compatible endpoints
     is_active = Boolean(default=True)
     created_at = Timestamptz(default=TimestamptzNow())
-    updated_at = Timestamptz(default=TimestamptzNow(), auto_update=TimestamptzNow())
+    updated_at = Timestamptz(default=TimestamptzNow())

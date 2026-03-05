@@ -98,19 +98,63 @@ def create_app() -> Sanic:
             status=status,
         )
 
-    # --- Startup event: seed data ---
+    # --- Startup event: create tables & seed data ---
     @app.before_server_start
-    async def startup(app_instance, loop):
+    async def startup(app_instance):
         logger.info("Accura backend starting – %s", settings.get("app.environment"))
+        await _create_tables()
         await _seed_subscription_plans()
 
     return app
 
 
+async def _create_tables():
+    """Create all database tables if they don't exist (dev / SQLite)."""
+    from models.user import User, UserProfile
+    from models.subscription import SubscriptionPlan, Subscription, Transaction
+    from models.chat import Conversation, ChatAgent, Iteration, ChatMessage
+    from models.settings import UserSettings
+    from models.mcp_server import MCPServer
+    from models.notification import Notification, NotificationPreference
+    from models.admin import AdminConfig, SystemPrompt, DomainRule
+    from models.api_key import UserAPIKey
+    from models.contact import ContactRequest
+
+    tables = [
+        User,
+        UserProfile,
+        SubscriptionPlan,
+        Subscription,
+        Transaction,
+        Conversation,
+        ChatAgent,
+        Iteration,
+        ChatMessage,
+        UserSettings,
+        MCPServer,
+        Notification,
+        NotificationPreference,
+        AdminConfig,
+        SystemPrompt,
+        DomainRule,
+        UserAPIKey,
+        ContactRequest,
+    ]
+
+    for table_cls in tables:
+        try:
+            await table_cls.create_table(if_not_exists=True).run()
+        except Exception as exc:
+            logger.warning("Table creation note (%s): %s", table_cls.__name__, exc)
+    logger.info("Database tables ensured.")
+
+
 async def _seed_subscription_plans():
     """Ensure default subscription plans exist."""
-    from models.subscription import SubscriptionPlan
+    import decimal
     import uuid
+
+    from models.subscription import SubscriptionPlan
 
     for plan_name in ("basic", "pro", "business"):
         existing = await SubscriptionPlan.select().where(
@@ -118,13 +162,15 @@ async def _seed_subscription_plans():
         ).first().run()
         if not existing:
             plan_config = settings.get(f"subscriptions.{plan_name}", {})
+            raw_monthly = plan_config.get("price_monthly", 0)
+            raw_yearly = plan_config.get("price_yearly", 0)
             await SubscriptionPlan.insert(
                 SubscriptionPlan(
                     id=str(uuid.uuid4()),
                     name=plan_name,
                     display_name=plan_name.capitalize(),
-                    price_monthly=plan_config.get("price_monthly", 0),
-                    price_yearly=plan_config.get("price_yearly", 0),
+                    price_monthly=decimal.Decimal(str(raw_monthly)),
+                    price_yearly=decimal.Decimal(str(raw_yearly)),
                     requests_per_minute=settings.get(f"rate_limits.{plan_name}.requests_per_minute", 10),
                     requests_per_day=settings.get(f"rate_limits.{plan_name}.requests_per_day", 100),
                     max_tokens_per_request=settings.get(f"rate_limits.{plan_name}.max_tokens_per_request", 4096),
@@ -144,7 +190,6 @@ if __name__ == "__main__":
     app.run(
         host=settings.get("app.host", "0.0.0.0"),
         port=settings.get("app.port", 8000),
-        workers=settings.get("app.workers", 1),
-        debug=settings.get("app.debug", False),
-        auto_reload=settings.get("app.debug", False),
+        debug=settings.get("app.debug", True),
+        single_process=True,
     )

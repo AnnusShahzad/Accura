@@ -2,20 +2,13 @@
 Accura Backend – Piccolo ORM Configuration
 """
 
+import os
+
 from piccolo.conf.apps import AppRegistry
-from piccolo.engine.postgres import PostgresEngine
+from piccolo.engine.sqlite import SQLiteEngine
 
-from config import settings
-
-DB = PostgresEngine(
-    config={
-        "host": settings.get("database.host", "localhost"),
-        "port": settings.get("database.port", 5432),
-        "database": settings.get("database.name", "accura"),
-        "user": settings.get("database.user", "accura"),
-        "password": settings.get("database.password", "changeme"),
-    },
-    extensions=("uuid-ossp",),
+DB = SQLiteEngine(
+    path=os.path.join(os.path.dirname(__file__), "accura_dev.db"),
 )
 
 APP_REGISTRY = AppRegistry(

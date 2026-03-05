@@ -25,7 +25,7 @@ class AdminConfig(Table, tablename="admin_config"):
     description = Text(default="")
     updated_by = Varchar(length=320, default="system")
     created_at = Timestamptz(default=TimestamptzNow())
-    updated_at = Timestamptz(default=TimestamptzNow(), auto_update=TimestamptzNow())
+    updated_at = Timestamptz(default=TimestamptzNow())
 
 
 class SystemPrompt(Table, tablename="system_prompts"):
@@ -37,7 +37,7 @@ class SystemPrompt(Table, tablename="system_prompts"):
     is_active = Boolean(default=True)
     version = Varchar(length=20, default="1.0")
     created_at = Timestamptz(default=TimestamptzNow())
-    updated_at = Timestamptz(default=TimestamptzNow(), auto_update=TimestamptzNow())
+    updated_at = Timestamptz(default=TimestamptzNow())
 
 
 class DomainRule(Table, tablename="domain_rules"):

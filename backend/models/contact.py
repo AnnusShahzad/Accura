@@ -26,4 +26,4 @@ class ContactRequest(Table, tablename="contact_requests"):
     is_resolved = Boolean(default=False)
     resolved_by = Varchar(length=320, default="")
     created_at = Timestamptz(default=TimestamptzNow())
-    updated_at = Timestamptz(default=TimestamptzNow(), auto_update=TimestamptzNow())
+    updated_at = Timestamptz(default=TimestamptzNow())

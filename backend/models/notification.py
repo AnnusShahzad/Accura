@@ -41,4 +41,4 @@ class NotificationPreference(Table, tablename="notification_preferences"):
     slack = Boolean(default=False)
     teams = Boolean(default=False)
     created_at = Timestamptz(default=TimestamptzNow())
-    updated_at = Timestamptz(default=TimestamptzNow(), auto_update=TimestamptzNow())
+    updated_at = Timestamptz(default=TimestamptzNow())

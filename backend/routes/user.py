@@ -7,6 +7,7 @@ PUT    /api/v1/user/profile
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timezone
 
 from sanic import Blueprint, Request
 
@@ -27,14 +28,16 @@ async def get_me(request: Request):
     ).first().run()
 
     return success({
-        "id": str(user["id"]),
-        "email": user["email"],
-        "username": user["username"],
-        "tier": user["tier"],
-        "is_active": user["is_active"],
-        "is_verified": user["is_verified"],
-        "is_admin": user["is_admin"],
-        "created_at": str(user["created_at"]),
+        "user": {
+            "id": str(user["id"]),
+            "email": user["email"],
+            "username": user["username"],
+            "tier": user["tier"],
+            "is_active": user["is_active"],
+            "is_verified": user["is_verified"],
+            "is_admin": user["is_admin"],
+            "created_at": str(user["created_at"]),
+        },
         "profile": profile or {},
     })
 
@@ -58,6 +61,8 @@ async def update_profile(request: Request):
         return error("No fields to update", status=422)
 
     if profile:
+        # Explicitly set updated_at to avoid TimestamptzNow issue with SQLite
+        updates["updated_at"] = datetime.now(timezone.utc)
         await UserProfile.update(updates).where(
             UserProfile.user == user_id
         ).run()
@@ -70,8 +75,26 @@ async def update_profile(request: Request):
             )
         ).run()
 
-    updated = await UserProfile.select().where(
+    updated_profile = await UserProfile.select().where(
         UserProfile.user == user_id
     ).first().run()
 
-    return success(updated, message="Profile updated")
+    # Re-fetch user data so frontend gets { user, profile }
+    user_data = await User.select().where(User.id == user_id).first().run()
+
+    return success(
+        {
+            "user": {
+                "id": str(user_data["id"]),
+                "email": user_data["email"],
+                "username": user_data["username"],
+                "tier": user_data["tier"],
+                "is_active": user_data["is_active"],
+                "is_verified": user_data["is_verified"],
+                "is_admin": user_data["is_admin"],
+                "created_at": str(user_data["created_at"]),
+            },
+            "profile": updated_profile or {},
+        },
+        message="Profile updated",
+    )

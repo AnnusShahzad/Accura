@@ -194,6 +194,34 @@ async def list_system_prompts(request: Request):
     return success(prompts)
 
 
+@bp.post("/system-prompts")
+@require_auth
+@require_admin
+async def create_system_prompt(request: Request):
+    try:
+        body = SystemPromptUpdateRequest(**request.json)
+    except Exception as exc:
+        return error(str(exc), status=422)
+
+    # Check if role already exists
+    existing = await SystemPrompt.select().where(SystemPrompt.role == body.role).first().run()
+    if existing:
+        return error(f"System prompt for role '{body.role}' already exists. Use PUT to update.", status=409)
+
+    prompt_id = str(uuid.uuid4())
+    await SystemPrompt.insert(
+        SystemPrompt(
+            id=prompt_id,
+            role=body.role,
+            prompt=body.prompt,
+            version=body.version,
+        )
+    ).run()
+
+    created = await SystemPrompt.select().where(SystemPrompt.id == prompt_id).first().run()
+    return success(created, message="System prompt created", status=201)
+
+
 @bp.put("/system-prompts")
 @require_auth
 @require_admin
@@ -220,6 +248,40 @@ async def upsert_system_prompt(request: Request):
         ).run()
 
     return success(message="System prompt updated")
+
+
+@bp.put("/system-prompts/<prompt_id:str>")
+@require_auth
+@require_admin
+async def update_system_prompt_by_id(request: Request, prompt_id: str):
+    try:
+        body = SystemPromptUpdateRequest(**request.json)
+    except Exception as exc:
+        return error(str(exc), status=422)
+
+    existing = await SystemPrompt.select().where(SystemPrompt.id == prompt_id).first().run()
+    if not existing:
+        return error("System prompt not found", status=404)
+
+    await SystemPrompt.update({
+        SystemPrompt.role: body.role,
+        SystemPrompt.prompt: body.prompt,
+        SystemPrompt.version: body.version,
+    }).where(SystemPrompt.id == prompt_id).run()
+
+    updated = await SystemPrompt.select().where(SystemPrompt.id == prompt_id).first().run()
+    return success(updated, message="System prompt updated")
+
+
+@bp.delete("/system-prompts/<prompt_id:str>")
+@require_auth
+@require_admin
+async def delete_system_prompt(request: Request, prompt_id: str):
+    existing = await SystemPrompt.select().where(SystemPrompt.id == prompt_id).first().run()
+    if not existing:
+        return error("System prompt not found", status=404)
+    await SystemPrompt.delete().where(SystemPrompt.id == prompt_id).run()
+    return success(message="System prompt deleted")
 
 
 # ---------------------------------------------------------------------------
@@ -260,6 +322,28 @@ async def create_domain_rule(request: Request):
 async def delete_domain_rule(request: Request, rule_id: str):
     await DomainRule.delete().where(DomainRule.id == rule_id).run()
     return success(message="Domain rule deleted")
+
+
+@bp.put("/domain-rules/<rule_id:str>")
+@require_auth
+@require_admin
+async def update_domain_rule(request: Request, rule_id: str):
+    try:
+        body = DomainRuleRequest(**request.json)
+    except Exception as exc:
+        return error(str(exc), status=422)
+
+    existing = await DomainRule.select().where(DomainRule.id == rule_id).first().run()
+    if not existing:
+        return error("Domain rule not found", status=404)
+
+    await DomainRule.update({
+        DomainRule.domain: body.domain,
+        DomainRule.rule_type: body.rule_type,
+    }).where(DomainRule.id == rule_id).run()
+
+    updated = await DomainRule.select().where(DomainRule.id == rule_id).first().run()
+    return success(updated, message="Domain rule updated")
 
 
 # ---------------------------------------------------------------------------
@@ -379,10 +463,34 @@ async def list_contact_requests(request: Request):
 @require_auth
 @require_admin
 async def resolve_contact_request(request: Request, request_id: str):
-    await ContactRequest.update({
+    body = request.json or {}
+    status_value = body.get("status", "resolved")
+    reply = body.get("reply", "")
+
+    updates = {
         ContactRequest.is_resolved: True,
         ContactRequest.resolved_by: request.ctx.user["email"],
-    }).where(ContactRequest.id == request_id).run()
+    }
+
+    await ContactRequest.update(updates).where(
+        ContactRequest.id == request_id
+    ).run()
+
+    # If a reply was provided, send it via email (best-effort)
+    if reply:
+        try:
+            contact_req = await ContactRequest.select().where(
+                ContactRequest.id == request_id
+            ).first().run()
+            if contact_req:
+                from utils.email import send_email
+                await send_email(
+                    to=contact_req["email"],
+                    subject=f"Re: {contact_req.get('subject', 'Your request')}",
+                    text_body=reply,
+                )
+        except Exception:
+            pass  # Non-critical
 
     return success(message="Contact request resolved")
 

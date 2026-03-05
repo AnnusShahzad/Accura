@@ -2,6 +2,8 @@
 Accura – Subscription, Plan & Transaction Models
 """
 
+import decimal
+
 from piccolo.columns import (
     UUID,
     Boolean,
@@ -24,15 +26,15 @@ class SubscriptionPlan(Table, tablename="subscription_plans"):
     id = UUID(primary_key=True)
     name = Varchar(length=50, unique=True)  # basic | pro | business
     display_name = Varchar(length=100)
-    price_monthly = Numeric(digits=(10, 2), default=0)
-    price_yearly = Numeric(digits=(10, 2), default=0)
+    price_monthly = Numeric(digits=(10, 2), default=decimal.Decimal("0"))
+    price_yearly = Numeric(digits=(10, 2), default=decimal.Decimal("0"))
     requests_per_minute = Integer(default=10)
     requests_per_day = Integer(default=100)
     max_tokens_per_request = Integer(default=4096)
     features = JSONB(default=[])
     is_active = Boolean(default=True)
     created_at = Timestamptz(default=TimestamptzNow())
-    updated_at = Timestamptz(default=TimestamptzNow(), auto_update=TimestamptzNow())
+    updated_at = Timestamptz(default=TimestamptzNow())
 
 
 class Subscription(Table, tablename="subscriptions"):
@@ -49,7 +51,7 @@ class Subscription(Table, tablename="subscriptions"):
     current_period_end = Timestamptz(null=True, default=None)
     cancelled_at = Timestamptz(null=True, default=None)
     created_at = Timestamptz(default=TimestamptzNow())
-    updated_at = Timestamptz(default=TimestamptzNow(), auto_update=TimestamptzNow())
+    updated_at = Timestamptz(default=TimestamptzNow())
 
 
 class Transaction(Table, tablename="transactions"):
@@ -58,7 +60,7 @@ class Transaction(Table, tablename="transactions"):
     id = UUID(primary_key=True)
     user = UUID(references=User, index=True)
     subscription = UUID(references=Subscription, null=True, default=None)
-    amount = Numeric(digits=(10, 2))
+    amount = Numeric(digits=(10, 2), default=decimal.Decimal("0"))
     currency = Varchar(length=3, default="USD")
     status = Varchar(length=20, default="pending")  # pending | succeeded | failed | refunded
     stripe_payment_id = Varchar(length=255, default="")

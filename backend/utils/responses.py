@@ -4,8 +4,30 @@ Accura – Response Helpers
 
 from __future__ import annotations
 
+import datetime
+import decimal
+import json
+import uuid
+
 from sanic import json as sanic_json
 from sanic.response import HTTPResponse
+
+
+class _AccuraEncoder(json.JSONEncoder):
+    """Custom encoder that handles common Piccolo types."""
+
+    def default(self, o):
+        if isinstance(o, uuid.UUID):
+            return str(o)
+        if isinstance(o, (datetime.datetime, datetime.date)):
+            return o.isoformat()
+        if isinstance(o, decimal.Decimal):
+            return float(o)
+        return super().default(o)
+
+
+def _dumps(obj, **kwargs):
+    return json.dumps(obj, cls=_AccuraEncoder, **kwargs)
 
 
 def success(data=None, message: str = "OK", status: int = 200, **kwargs) -> HTTPResponse:
@@ -13,7 +35,11 @@ def success(data=None, message: str = "OK", status: int = 200, **kwargs) -> HTTP
     if data is not None:
         body["data"] = data
     body.update(kwargs)
-    return sanic_json(body, status=status)
+    return HTTPResponse(
+        body=_dumps(body),
+        status=status,
+        content_type="application/json",
+    )
 
 
 def error(message: str = "Error", status: int = 400, errors=None, **kwargs) -> HTTPResponse:
@@ -21,7 +47,11 @@ def error(message: str = "Error", status: int = 400, errors=None, **kwargs) -> H
     if errors:
         body["errors"] = errors
     body.update(kwargs)
-    return sanic_json(body, status=status)
+    return HTTPResponse(
+        body=_dumps(body),
+        status=status,
+        content_type="application/json",
+    )
 
 
 def paginated(items: list, total: int, page: int, per_page: int, **kwargs) -> HTTPResponse:

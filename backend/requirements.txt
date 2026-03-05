@@ -1,50 +1,50 @@
 # Sanic Web Framework
-sanic==24.6.0
-sanic-ext==24.6.0
+sanic
+sanic-ext
 
 # Piccolo ORM
-piccolo[all]==1.22.0
-piccolo_admin==1.5.1
-piccolo_api==1.4.0
+piccolo[all]
+piccolo_admin
+piccolo_api
 
 # Authentication
-PyJWT==2.9.0
-bcrypt==4.2.0
-cryptography==43.0.1
+PyJWT
+bcrypt
+cryptography
 
 # HTTP / AI Clients
-httpx==0.27.2
-openai==1.51.0
+httpx
+openai
 
 # Configuration
-pyyaml==6.0.2
-python-dotenv==1.0.1
+pyyaml
+python-dotenv
 
 # Email
-aiosmtplib==3.0.2
-jinja2==3.1.4
+aiosmtplib
+jinja2
 
 # Validation
-pydantic==2.9.2
+pydantic
 
 # Rate Limiting
-sanic-limiter==0.1.3
+sanic-limiter
 
 # Scheduling (recurring billing)
-apscheduler==3.10.4
+apscheduler
 
 # Webhooks
-slack-sdk==3.33.1
+slack-sdk
 
 # Search
-googlesearch-python==1.2.5
+googlesearch-python
 
 # Testing
-pytest==8.3.3
-pytest-asyncio==0.24.0
-pytest-sanic==1.9.1
+pytest
+pytest-asyncio
+pytest-sanic
 
 # Utilities
-ujson==5.10.0
-aiofiles==24.1.0
-uuid6==2024.7.10
+ujson
+aiofiles
+uuid6

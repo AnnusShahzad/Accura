@@ -31,4 +31,4 @@ class MCPServer(Table, tablename="mcp_servers"):
     headers = JSONB(default={})
     metadata = JSONB(default={})
     created_at = Timestamptz(default=TimestamptzNow())
-    updated_at = Timestamptz(default=TimestamptzNow(), auto_update=TimestamptzNow())
+    updated_at = Timestamptz(default=TimestamptzNow())

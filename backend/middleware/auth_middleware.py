@@ -29,6 +29,7 @@ _PUBLIC_PATHS: set[str] = {
     "/api/v1/contact",
     "/api/v1/health",
     "/api/v1/plans",
+    "/api/v1/billing/plans",
 }
 
 
@@ -38,6 +39,11 @@ def _is_public(path: str) -> bool:
 
 async def auth_middleware(request: Request):
     """Sanic middleware – attaches ``request.ctx.user`` for authenticated routes."""
+    # Always allow CORS preflight requests through
+    if request.method == "OPTIONS":
+        request.ctx.user = None
+        return
+
     if _is_public(request.path):
         request.ctx.user = None
         return

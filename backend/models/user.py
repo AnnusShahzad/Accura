@@ -26,7 +26,7 @@ class User(Table, tablename="users"):
     is_admin = Boolean(default=False)
     tier = Varchar(length=20, default="basic")  # basic | pro | business
     created_at = Timestamptz(default=TimestamptzNow())
-    updated_at = Timestamptz(default=TimestamptzNow(), auto_update=TimestamptzNow())
+    updated_at = Timestamptz(default=TimestamptzNow())
 
 
 class UserProfile(Table, tablename="user_profiles"):
@@ -41,4 +41,4 @@ class UserProfile(Table, tablename="user_profiles"):
     company = Varchar(length=255, default="")
     timezone = Varchar(length=64, default="UTC")
     created_at = Timestamptz(default=TimestamptzNow())
-    updated_at = Timestamptz(default=TimestamptzNow(), auto_update=TimestamptzNow())
+    updated_at = Timestamptz(default=TimestamptzNow())

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Navbar } from "@/components/layout/navbar";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { QueryProvider } from "@/components/providers/query-provider";
@@ -36,7 +37,10 @@ export default function RootLayout({
         <ThemeProvider>
           <QueryProvider>
             <AuthProvider>
-              <TooltipProvider>{children}</TooltipProvider>
+              <TooltipProvider>
+  <Navbar />
+  {children}
+</TooltipProvider>
               <Toaster richColors position="top-right" />
             </AuthProvider>
           </QueryProvider>

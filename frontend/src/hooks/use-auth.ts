@@ -28,13 +28,40 @@ export function useAuth() {
   });
 
   const registerMutation = useMutation({
-    mutationFn: (data: RegisterRequest) => authApi.register(data),
+      mutationFn: (data: RegisterRequest) => authApi.register(data),
+      onSuccess: () => {
+        toast.success("Account created! Please check your email to verify.");
+        router.push("/login");
+      },
+      onError: (error: Error) => {
+        toast.error(error.message || "Failed to register");
+      },
+    });
+
+    const forgotPasswordMutation = useMutation({
+    mutationFn: (email: string) => authApi.forgotPassword(email),
     onSuccess: () => {
-      toast.success("Account created! Please check your email to verify.");
+      toast.success("If the email exists, a reset link has been sent.");
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to send reset email");
+    },
+  });
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: ({
+      token,
+      new_password,
+    }: {
+      token: string;
+      new_password: string;
+    }) => authApi.resetPassword(token, new_password),
+    onSuccess: () => {
+      toast.success("Password reset successful");
       router.push("/login");
     },
     onError: (error: Error) => {
-      toast.error(error.message || "Failed to register");
+      toast.error(error.message || "Failed to reset password");
     },
   });
 
@@ -55,5 +82,9 @@ export function useAuth() {
     logout,
     isLoggingIn: loginMutation.isPending,
     isRegistering: registerMutation.isPending,
+    forgotPassword: forgotPasswordMutation.mutateAsync,
+    resetPassword: resetPasswordMutation.mutateAsync,
+    isRequestingPasswordReset: forgotPasswordMutation.isPending,
+    isResettingPassword: resetPasswordMutation.isPending,
   };
 }

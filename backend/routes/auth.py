@@ -26,6 +26,15 @@ from services.auth_service import (
     register_user,
     verify_email,
 )
+from services.auth_service import (
+    change_password,
+    login_user,
+    refresh_tokens,
+    register_user,
+    verify_email,
+    request_password_reset,
+    reset_password,
+)
 from utils.exceptions import AuthenticationError, ValidationError
 from utils.responses import error, success
 
@@ -97,6 +106,33 @@ async def verify(request: Request):
 
     return success(message="Email verified")
 
+@bp.post("/forgot-password")
+async def forgot_password(request: Request):
+
+    email = request.json.get("email")
+
+    if not email:
+        return error("Email is required", status=422)
+
+    await request_password_reset(email)
+
+    return success(message="If the email exists, a reset link has been sent.")
+
+@bp.post("/reset-password")
+async def reset_pwd(request: Request):
+
+    token = request.json.get("token")
+    new_password = request.json.get("new_password")
+
+    if not token or not new_password:
+        return error("Token and new password are required", status=422)
+
+    try:
+        await reset_password(token, new_password)
+    except AuthenticationError as exc:
+        return error(exc.message, status=exc.status_code)
+
+    return success(message="Password reset successful")
 
 @bp.post("/change-password")
 @require_auth

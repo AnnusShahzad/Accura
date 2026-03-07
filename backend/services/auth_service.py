@@ -211,6 +211,38 @@ async def verify_email(token: str) -> bool:
     await User.update({User.is_verified: True}).where(User.id == user_id).run()
     return True
 
+# ---------------------------------------------------------------------------
+# Request password fun
+# ---------------------------------------------------------------------------
+
+async def request_password_reset(email: str) -> bool:
+
+    user = await User.select().where(User.email == email).first().run()
+
+    # Security: don't reveal if email exists
+    if not user:
+        return True
+
+    user_id = str(user["id"])
+
+    reset_token = create_access_token(
+        user_id,
+        extra={"type": "password_reset"}
+    )
+
+    reset_url = f"{settings.get('app.frontend_url','')}/reset-password?token={reset_token}"
+
+    await send_email(
+        to=user["email"],
+        subject="Reset your Accura password",
+        template_name="reset_password.html",
+        template_context={
+            "username": user["username"],
+            "reset_url": reset_url,
+        },
+    )
+
+    return True
 
 # ---------------------------------------------------------------------------
 # Change password
@@ -226,4 +258,27 @@ async def change_password(user_id: str, old_password: str, new_password: str) ->
 
     hashed = hash_password(new_password)
     await User.update({User.hashed_password: hashed}).where(User.id == user_id).run()
+    return True
+
+# ---------------------------------------------------------------------------
+# Reset password fun
+# ---------------------------------------------------------------------------
+
+async def reset_password(token: str, new_password: str) -> bool:
+
+    payload = decode_token(token)
+
+    if payload.get("type") != "password_reset":
+        raise AuthenticationError("Invalid reset token")
+
+    user_id = payload["sub"]
+
+    hashed = hash_password(new_password)
+
+    await User.update(
+        {User.hashed_password: hashed}
+    ).where(
+        User.id == user_id
+    ).run()
+
     return True

@@ -12,6 +12,8 @@ app:
   port: 8000
   workers: 4
   debug: false
+  app:
+  frontend_url: http://localhost:3000
 
 branding:
   company_name: "Accura"

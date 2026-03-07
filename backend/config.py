@@ -43,6 +43,7 @@ def _env_overrides() -> dict:
         ("APP_DEBUG", "app.debug", lambda v: v.lower() in ("true", "1", "yes")),
         ("APP_WORKERS", "app.workers", int),
         ("APP_SECRET_KEY", "app.secret_key", str),
+        ("APP_FRONTEND_URL", "app.frontend_url", str),
         ("DB_HOST", "database.host", str),
         ("DB_PORT", "database.port", int),
         ("DB_NAME", "database.name", str),

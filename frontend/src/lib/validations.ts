@@ -40,6 +40,23 @@ export const changePasswordSchema = z
     path: ["confirmPassword"],
   });
 
+export const forgotPasswordSchema = z.object({
+  email: z.string().email("Please enter a valid email"),
+});
+
+export const resetPasswordSchema = z
+  .object({
+    new_password: z
+      .string()
+      .min(8, "Password must be at least 8 characters")
+      .max(128),
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.new_password === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ["confirmPassword"],
+  });
+
 // ─── Profile Validations ───
 export const profileSchema = z.object({
   first_name: z.string().max(150).optional(),
@@ -154,3 +171,5 @@ export type ContactFormData = z.infer<typeof contactSchema>;
 export type SystemPromptFormData = z.infer<typeof systemPromptSchema>;
 export type DomainRuleFormData = z.infer<typeof domainRuleSchema>;
 export type PlanUpdateFormData = z.infer<typeof planUpdateSchema>;
+export type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>;
+export type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;

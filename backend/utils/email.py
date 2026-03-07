@@ -55,6 +55,11 @@ async def send_email(
     if html_body:
         msg.attach(MIMEText(html_body, "html"))
 
+    # Logic for TLS vs STARTTLS:
+    # Port 465 is usually implicit TLS.
+    # Port 587 or 25 usually uses STARTTLS.
+    is_smtps = (smtp_port == 465)
+    
     try:
         await aiosmtplib.send(
             msg,
@@ -62,7 +67,8 @@ async def send_email(
             port=smtp_port,
             username=smtp_user or None,
             password=smtp_password or None,
-            use_tls=use_tls,
+            use_tls=is_smtps,
+            start_tls=use_tls if not is_smtps else False,
         )
         logger.info("Email sent to %s: %s", to, subject)
     except Exception:

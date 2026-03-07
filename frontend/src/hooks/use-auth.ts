@@ -22,16 +22,30 @@ export function useAuth() {
       toast.success("Welcome back!");
       router.push("/chat");
     },
-    onError: (error: Error) => {
-      toast.error(error.message || "Failed to log in");
+    onError: (error: any, variables) => {
+      const message = error.message || "Failed to log in";
+      toast.error(message);
+      
+      // If the error is about email verification, redirect to OTP page
+      if (message.toLowerCase().includes("verify your email") || message.toLowerCase().includes("unverified")) {
+        router.push(`/verify-otp?email=${encodeURIComponent(variables.email)}`);
+      }
     },
   });
 
   const registerMutation = useMutation({
     mutationFn: (data: RegisterRequest) => authApi.register(data),
-    onSuccess: () => {
-      toast.success("Account created! Please check your email to verify.");
-      router.push("/login");
+    onSuccess: (res, variables) => {
+      if ((res.data as any).already_exists_unverified) {
+        toast.error(
+          "Account already exists but is not verified. A new verification code has been sent to your email."
+        );
+      } else {
+        toast.success(
+          "Account created! Please check your email for the verification code."
+        );
+      }
+      router.push(`/verify-otp?email=${encodeURIComponent(variables.email)}`);
     },
     onError: (error: Error) => {
       toast.error(error.message || "Failed to register");

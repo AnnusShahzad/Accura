@@ -1,8 +1,13 @@
+"use client";
+
 import { Button } from "@/components/ui/button";
 import { Zap, ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { useAuthStore } from "@/stores/auth-store";
 
 export function Hero() {
+  const { isAuthenticated, isLoading } = useAuthStore();
+
   return (
     <section className="relative overflow-hidden py-24 sm:py-32">
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
@@ -21,15 +26,26 @@ export function Hero() {
             models compete to give you the best answer.
           </p>
           <div className="mt-10 flex items-center justify-center gap-x-4">
-            <Button size="lg" asChild>
-              <Link href="/register">
-                Get Started Free
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-            <Button variant="outline" size="lg" asChild>
-              <Link href="/login">Sign In</Link>
-            </Button>
+            {!isLoading && isAuthenticated ? (
+              <Button size="lg" asChild>
+                <Link href="/chat">
+                  Go to Dashboard
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            ) : (
+              <>
+                <Button size="lg" asChild>
+                  <Link href="/register">
+                    Get Started Free
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+                <Button variant="outline" size="lg" asChild>
+                  <Link href="/login">Sign In</Link>
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </div>

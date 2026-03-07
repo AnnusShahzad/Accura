@@ -11,12 +11,23 @@ export const registerSchema = z
     email: z.string().email("Please enter a valid email"),
     username: z
       .string()
-      .min(3, "Username must be at least 3 characters")
-      .max(150),
+      .min(5, "Username must be at least 5 characters")
+      .max(150)
+      .regex(
+        /^[a-zA-Z0-9_]+$/,
+        "Username can only contain letters, numbers, and underscores"
+      ),
     password: z
       .string()
-      .min(8, "Password must be at least 8 characters")
-      .max(128),
+      .min(9, "Password must be greater than 8 characters")
+      .max(128)
+      .regex(/[A-Z]/, "Password must contain at least 1 uppercase letter")
+      .regex(/[a-z]/, "Password must contain at least 1 lowercase letter")
+      .regex(/[0-9]/, "Password must contain at least 1 number")
+      .regex(
+        /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/,
+        "Password must contain at least 1 special character"
+      ),
     confirmPassword: z.string(),
     first_name: z.string().max(150).optional(),
     last_name: z.string().max(150).optional(),
@@ -31,14 +42,29 @@ export const changePasswordSchema = z
     old_password: z.string().min(1, "Current password is required"),
     new_password: z
       .string()
-      .min(8, "Password must be at least 8 characters")
-      .max(128),
+      .min(9, "Password must be greater than 8 characters")
+      .max(128)
+      .regex(/[A-Z]/, "Password must contain at least 1 uppercase letter")
+      .regex(/[a-z]/, "Password must contain at least 1 lowercase letter")
+      .regex(/[0-9]/, "Password must contain at least 1 number")
+      .regex(
+        /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/,
+        "Password must contain at least 1 special character"
+      ),
     confirmPassword: z.string(),
   })
   .refine((data) => data.new_password === data.confirmPassword, {
     message: "Passwords don't match",
     path: ["confirmPassword"],
   });
+
+export const verifyOtpSchema = z.object({
+  email: z.string().email("Please enter a valid email"),
+  otp: z
+    .string()
+    .length(6, "OTP must be 6 digits")
+    .regex(/^\d+$/, "OTP must contain only numbers"),
+});
 
 // ─── Profile Validations ───
 export const profileSchema = z.object({
@@ -144,6 +170,7 @@ export const planUpdateSchema = z.object({
 export type LoginFormData = z.infer<typeof loginSchema>;
 export type RegisterFormData = z.infer<typeof registerSchema>;
 export type ChangePasswordFormData = z.infer<typeof changePasswordSchema>;
+export type VerifyOtpFormData = z.infer<typeof verifyOtpSchema>;
 export type ProfileFormData = z.infer<typeof profileSchema>;
 export type CreateConversationFormData = z.infer<typeof createConversationSchema>;
 export type AddAgentFormData = z.infer<typeof addAgentSchema>;

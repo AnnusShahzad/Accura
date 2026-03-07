@@ -20,22 +20,26 @@ logger = logging.getLogger("accura.auth")
 _JWT_SECRET = settings.get("jwt.secret", "changeme")
 _JWT_ALGORITHM = settings.get("jwt.algorithm", "HS256")
 
-# Public paths that skip auth
 _PUBLIC_PATHS: set[str] = {
     "/api/v1/auth/login",
     "/api/v1/auth/register",
     "/api/v1/auth/refresh",
     "/api/v1/auth/verify-email",
+    "/api/v1/auth/verify-otp",
+    "/api/v1/auth/resend-otp",
     "/api/v1/contact",
     "/api/v1/health",
     "/api/v1/plans",
     "/api/v1/billing/plans",
 }
 
-
 def _is_public(path: str) -> bool:
+    if path.startswith("/api/v1/auth/check-username/"):
+        return True
     return path in _PUBLIC_PATHS or path.startswith("/api/v1/public")
 
+
+    return path in _PUBLIC_PATHS or path.startswith("/api/v1/public")
 
 async def auth_middleware(request: Request):
     """Sanic middleware – attaches ``request.ctx.user`` for authenticated routes."""

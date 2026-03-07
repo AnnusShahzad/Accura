@@ -12,10 +12,14 @@ from typing import Any
 import yaml
 from dotenv import load_dotenv
 
-load_dotenv()
-
 _BASE_DIR = Path(__file__).resolve().parent
 _CONFIG_PATH = os.getenv("ACCURA_CONFIG_PATH", str(_BASE_DIR / "config.yaml"))
+_ENV_PATH = _BASE_DIR / ".env"
+
+if _ENV_PATH.exists():
+    load_dotenv(dotenv_path=_ENV_PATH, override=True)
+else:
+    load_dotenv(override=True)
 
 
 def _deep_merge(base: dict, override: dict) -> dict:

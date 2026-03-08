@@ -209,6 +209,16 @@ export const authApi = {
     });
   },
 
+  verifyEmailChange(token: string) {
+    return fetch(`${API_BASE_URL}/auth/verify-email-change`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ token }),
+    }).then(res => res.json());
+  },
+
   verifyOtp(data: { email: string; otp: string }) {
     return apiFetch<ApiResponse<null>>("/auth/verify-otp", {
       method: "POST",
@@ -248,6 +258,14 @@ export const userApi = {
       body: JSON.stringify(data),
     });
   },
+
+  requestEmailChange(data: { email: string }) {
+    return apiFetch<ApiResponse<null>>("/auth/request-email-change", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
 };
 
 // ═══════════════════════════════════════════════════════

@@ -75,6 +75,7 @@ export const resetPasswordSchema = z
     path: ["confirmPassword"],
   });
 
+
 export const verifyOtpSchema = z.object({
   email: z.string().email("Please enter a valid email"),
   otp: z

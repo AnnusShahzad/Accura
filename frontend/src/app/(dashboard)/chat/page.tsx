@@ -3,12 +3,6 @@
 import { useState } from "react";
 import { useConversations, useDeleteConversation } from "@/hooks/use-chat";
 import { useChatStore } from "@/stores/chat-store";
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -37,9 +31,7 @@ export default function ChatListPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Conversations</h1>
-          <p className="text-muted-foreground">
-            Your AI conversation history
-          </p>
+          <p className="text-muted-foreground">Your AI conversation history</p>
         </div>
         <Button asChild>
           <Link href="/chat/new">
@@ -52,76 +44,74 @@ export default function ChatListPage() {
       {isLoading ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
-            <Card key={i}>
-              <CardHeader>
-                <Skeleton className="h-5 w-3/4" />
-                <Skeleton className="mt-2 h-4 w-1/2" />
-              </CardHeader>
-            </Card>
+            <div key={i} className="rounded-lg border bg-card p-4 space-y-2">
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-3 w-1/2" />
+            </div>
           ))}
         </div>
       ) : conversations.length === 0 ? (
-        <Card className="flex flex-col items-center justify-center py-16">
-          <MessageSquare className="h-12 w-12 text-muted-foreground" />
-          <CardHeader className="text-center">
-            <CardTitle>No conversations yet</CardTitle>
-            <CardDescription>
-              Start a new chat to begin generating AI responses
-            </CardDescription>
-          </CardHeader>
-          <Button asChild>
+        <div className="flex flex-col items-center justify-center py-16 rounded-lg border bg-card gap-4">
+          <MessageSquare className="h-10 w-10 text-muted-foreground" />
+          <div className="text-center">
+            <p className="font-semibold">No conversations yet</p>
+            <p className="text-sm text-muted-foreground">Start a new chat to begin generating AI responses</p>
+          </div>
+          <Button asChild size="sm">
             <Link href="/chat/new">
               <Plus className="mr-2 h-4 w-4" />
               Start First Chat
             </Link>
           </Button>
-        </Card>
+        </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
           {conversations.map((conv) => (
-            <Card
+            <div
               key={conv.id}
-              className="group flex flex-col transition-colors hover:border-primary/50"
+              className="group relative rounded-lg border bg-card transition-colors hover:border-primary/50"
             >
-              {/* Top row: Badge + Delete button */}
-              <div className="flex items-center justify-between px-6 pt-5">
-                <Badge
-                  variant={
-                    conv.status === "completed" ? "default" : "secondary"
-                  }
-                >
-                  {conv.status}
-                </Badge>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/10"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setConfirmId(conv.id);
-                  }}
-                >
-                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                </Button>
-              </div>
+              {/* Single compact content block */}
+              <div className="p-4 space-y-2">
 
-              {/* Title + meta — clickable */}
-              <Link href={`/chat/${conv.id}`} className="flex-1">
-                <CardHeader className="pt-3">
-                  <CardTitle className="text-base line-clamp-2">
+                {/* Row 1: Badge + Delete */}
+                <div className="flex items-center justify-between">
+                  <Badge
+                    variant={conv.status === "completed" ? "default" : "secondary"}
+                    className="text-xs px-2 py-0"
+                  >
+                    {conv.status}
+                  </Badge>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 -mr-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/10"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setConfirmId(conv.id);
+                    }}
+                  >
+                    <Trash2 className="h-3 w-3 text-destructive" />
+                  </Button>
+                </div>
+
+                {/* Row 2: Title — clickable */}
+                <Link href={`/chat/${conv.id}`} className="block">
+                  <p className="text-sm font-semibold line-clamp-2 leading-snug hover:text-primary transition-colors">
                     {conv.title}
-                  </CardTitle>
-                  <CardDescription className="flex items-center justify-between pt-1">
-                    <span>{formatDate(conv.created_at)}</span>
-                    {conv.best_score > 0 && (
-                      <span className="font-medium text-primary">
-                        Score: {conv.best_score}%
-                      </span>
-                    )}
-                  </CardDescription>
-                </CardHeader>
-              </Link>
-            </Card>
+                  </p>
+                </Link>
+
+                {/* Row 3: Date + Score */}
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">{formatDate(conv.created_at)}</span>
+                  {conv.best_score > 0 && (
+                    <span className="text-xs font-medium text-primary">Score: {conv.best_score}%</span>
+                  )}
+                </div>
+
+              </div>
+            </div>
           ))}
         </div>
       )}

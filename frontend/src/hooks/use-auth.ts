@@ -34,6 +34,7 @@ export function useAuth() {
   });
 
   const registerMutation = useMutation({
+
     mutationFn: (data: RegisterRequest) => authApi.register(data),
     onSuccess: (res, variables) => {
       if ((res.data as any).already_exists_unverified) {

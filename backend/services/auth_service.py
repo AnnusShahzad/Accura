@@ -282,3 +282,61 @@ async def reset_password(token: str, new_password: str) -> bool:
     ).run()
 
     return True
+
+async def request_email_change(user_id: str, new_email: str) -> bool:
+    from models.user import User
+    from utils.email import send_email
+    from config import settings
+
+    existing = await User.select().where(User.email == new_email).first().run()
+    if existing:
+        raise ValidationError("Email already in use")
+
+    token = create_access_token(
+        user_id,
+        extra={
+            "type": "email_change",
+            "new_email": new_email,
+        },
+    )
+
+    verify_url = f"{settings.get('app.frontend_url','')}/email-change?token={token}"
+
+    user = await User.select().where(User.id == user_id).first().run()
+
+    await send_email(
+        to=new_email,
+        subject="Confirm your new email",
+        template_name="verify_email.html",
+        template_context={
+            "username": user["username"],
+            "verification_url": verify_url,
+        },
+    )
+
+    return True
+
+async def confirm_email_change(token: str) -> bool:
+
+    payload = decode_token(token)
+
+    print("TOKEN PAYLOAD:", payload)
+
+    if payload.get("type") != "email_change":
+        raise AuthenticationError("Invalid email change token")
+
+    user_id = payload["sub"]
+    new_email = payload["new_email"]
+
+    print("Updating user:", user_id)
+    print("New email:", new_email)
+
+    await User.update(
+        {User.email: new_email}
+    ).where(
+        User.id == user_id
+    ).run()
+
+    print("EMAIL UPDATED")
+
+    return True

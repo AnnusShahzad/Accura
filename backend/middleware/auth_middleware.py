@@ -32,6 +32,7 @@ _PUBLIC_PATHS: set[str] = {
     "/api/v1/health",
     "/api/v1/plans",
     "/api/v1/billing/plans",
+    "/api/v1/auth/verify-email-change",
 }
 
 

@@ -21,6 +21,14 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +43,25 @@ export default function ProfilePage() {
   const { setUser } = useAuthStore();
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  const [showEmailChange, setShowEmailChange] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
+
+  const onChangeEmail = async () => {
+    if (!newEmail) {
+      toast.error("Please enter a new email");
+      return;
+    }
+
+    try {
+      await userApi.requestEmailChange({ email: newEmail });
+      toast.success("Verification email sent");
+      setShowEmailChange(false);
+      setNewEmail("");
+    } catch {
+      toast.error("Failed to change email");
+    }
+  };
 
   const profileForm = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
@@ -116,8 +143,38 @@ export default function ProfilePage() {
         <CardContent className="space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">Email</span>
-            <span className="font-medium">{user?.email}</span>
+            <div className="flex items-center gap-2">
+              <span className="font-medium">{user?.email}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowEmailChange(true)}
+              >
+                Change
+              </Button>
+            </div>
           </div>
+          {showEmailChange && (
+            <div className="flex items-center gap-2 pt-2">
+              <Input
+                placeholder="Enter new email"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+              />
+
+              <Button size="sm" onClick={onChangeEmail}>
+                Submit
+              </Button>
+
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowEmailChange(false)}
+              >
+                Cancel
+              </Button>
+            </div>
+          )}
           <Separator />
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">Username</span>
@@ -287,12 +344,32 @@ export default function ProfilePage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" disabled={isChangingPassword}>
-                {isChangingPassword && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
-                Change Password
-              </Button>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button type="button">Change Password</Button>
+                </DialogTrigger>
+
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Confirm Password Change</DialogTitle>
+                  </DialogHeader>
+
+                  <p className="text-sm text-muted-foreground">
+                    Your password will be changed. Continue?
+                  </p>
+
+                  <DialogFooter>
+                    <Button variant="outline">Cancel</Button>
+
+                    <Button
+                      onClick={passwordForm.handleSubmit(onChangePassword)}
+                      disabled={isChangingPassword}
+                    >
+                      Confirm
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </form>
           </Form>
         </CardContent>

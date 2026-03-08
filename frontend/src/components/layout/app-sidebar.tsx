@@ -27,7 +27,9 @@ import {
   Plus,
   Zap,
   User,
+  LogOut,
 } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
 
 const mainNav = [
   { title: "Chat", href: "/chat", icon: MessageSquare },
@@ -57,6 +59,7 @@ const adminNav = [
 export function AppSidebar() {
   const pathname = usePathname();
   const { user } = useAuthStore();
+  const { logout } = useAuth();
 
   return (
     <Sidebar>
@@ -139,6 +142,22 @@ export function AppSidebar() {
         )}
       </SidebarContent>
 
+      <SidebarFooter >
+        <SidebarMenu>
+                  <SidebarMenuItem key="logout">
+                    <SidebarMenuButton
+                      asChild
+                      isActive={false}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <button type="button" onClick={logout} className="w-full cursor-pointer">
+                        <LogOut className="h-4 w-4" />
+                        <span>Logout</span>
+                      </button>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+              </SidebarMenu>
+      </SidebarFooter>
       <SidebarFooter className="border-t p-4">
         <p className="text-xs text-muted-foreground">
           &copy; {new Date().getFullYear()} Accura AI

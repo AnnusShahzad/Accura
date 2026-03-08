@@ -26,6 +26,7 @@ import {
   Shield,
   Plus,
   Zap,
+  User,
 } from "lucide-react";
 
 const mainNav = [
@@ -35,6 +36,7 @@ const mainNav = [
 
 const settingsNav = [
   { title: "General", href: "/settings", icon: Settings },
+  { title: "Profile", href: "/settings/profile", icon: User },
   { title: "API Keys", href: "/settings/api-keys", icon: Key },
   { title: "MCP Servers", href: "/settings/mcp-servers", icon: Server },
   { title: "Billing", href: "/settings/billing", icon: CreditCard },

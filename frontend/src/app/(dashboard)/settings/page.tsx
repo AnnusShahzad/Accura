@@ -35,9 +35,11 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Loader2 } from "lucide-react";
 import { useEffect } from "react";
+import { useTheme } from "next-themes";
 
 export default function SettingsPage() {
   const { data: settings, isLoading } = useSettings();
+  const { setTheme } = useTheme();
   const updateSettings = useUpdateSettings();
 
   const form = useForm<SettingsFormData>({
@@ -73,6 +75,7 @@ export default function SettingsPage() {
 
   const onSubmit = (data: SettingsFormData) => {
     updateSettings.mutate(data);
+    setTheme(data.dark_mode ? "dark" : "light");
   };
 
   if (isLoading) {

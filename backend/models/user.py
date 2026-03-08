@@ -25,6 +25,8 @@ class User(Table, tablename="users"):
     is_verified = Boolean(default=False)
     is_admin = Boolean(default=False)
     tier = Varchar(length=20, default="basic")  # basic | pro | business
+    otp_code = Varchar(length=6, default="")
+    otp_expires_at = Timestamptz(null=True, default=None)
     created_at = Timestamptz(default=TimestamptzNow())
     updated_at = Timestamptz(default=TimestamptzNow())
 

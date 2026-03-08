@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useConversations, useDeleteConversation } from "@/hooks/use-chat";
 import { useChatStore } from "@/stores/chat-store";
 import {
@@ -11,6 +12,16 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Plus, MessageSquare, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { formatDate } from "@/lib/utils";
@@ -19,6 +30,7 @@ export default function ChatListPage() {
   const { data, isLoading } = useConversations();
   const { conversations } = useChatStore();
   const deleteConversation = useDeleteConversation();
+  const [confirmId, setConfirmId] = useState<string | null>(null);
 
   return (
     <div className="space-y-6">
@@ -69,23 +81,37 @@ export default function ChatListPage() {
           {conversations.map((conv) => (
             <Card
               key={conv.id}
-              className="group relative transition-colors hover:border-primary/50"
+              className="group flex flex-col transition-colors hover:border-primary/50"
             >
-              <Link href={`/chat/${conv.id}`}>
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <CardTitle className="text-base line-clamp-2">
-                      {conv.title}
-                    </CardTitle>
-                    <Badge
-                      variant={
-                        conv.status === "completed" ? "default" : "secondary"
-                      }
-                    >
-                      {conv.status}
-                    </Badge>
-                  </div>
-                  <CardDescription className="flex items-center justify-between">
+              {/* Top row: Badge + Delete button */}
+              <div className="flex items-center justify-between px-6 pt-5">
+                <Badge
+                  variant={
+                    conv.status === "completed" ? "default" : "secondary"
+                  }
+                >
+                  {conv.status}
+                </Badge>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/10"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setConfirmId(conv.id);
+                  }}
+                >
+                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                </Button>
+              </div>
+
+              {/* Title + meta — clickable */}
+              <Link href={`/chat/${conv.id}`} className="flex-1">
+                <CardHeader className="pt-3">
+                  <CardTitle className="text-base line-clamp-2">
+                    {conv.title}
+                  </CardTitle>
+                  <CardDescription className="flex items-center justify-between pt-1">
                     <span>{formatDate(conv.created_at)}</span>
                     {conv.best_score > 0 && (
                       <span className="font-medium text-primary">
@@ -95,17 +121,6 @@ export default function ChatListPage() {
                   </CardDescription>
                 </CardHeader>
               </Link>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute right-2 top-2 opacity-0 group-hover:opacity-100"
-                onClick={(e) => {
-                  e.preventDefault();
-                  deleteConversation.mutate(conv.id);
-                }}
-              >
-                <Trash2 className="h-4 w-4 text-destructive" />
-              </Button>
             </Card>
           ))}
         </div>
@@ -118,6 +133,32 @@ export default function ChatListPage() {
           </p>
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!confirmId} onOpenChange={() => setConfirmId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this conversation?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. The conversation will be permanently deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (confirmId) {
+                  deleteConversation.mutate(confirmId);
+                  setConfirmId(null);
+                }
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

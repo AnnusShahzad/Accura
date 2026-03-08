@@ -33,7 +33,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Loader2 } from "lucide-react";
+import { Loader2, Eye, EyeOff, Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
 import { useAuthStore } from "@/stores/auth-store";
@@ -46,6 +46,10 @@ export default function ProfilePage() {
 
   const [showEmailChange, setShowEmailChange] = useState(false);
   const [newEmail, setNewEmail] = useState("");
+
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const onChangeEmail = async () => {
     if (!newEmail) {
@@ -82,6 +86,19 @@ export default function ProfilePage() {
       confirmPassword: "",
     },
   });
+
+  const newPassword = passwordForm.watch("new_password") || "";
+
+  const passwordChecks = [
+    { label: "Greater than 8 characters", met: newPassword.length > 8 },
+    { label: "1 uppercase letter", met: /[A-Z]/.test(newPassword) },
+    { label: "1 lowercase letter", met: /[a-z]/.test(newPassword) },
+    { label: "1 number", met: /[0-9]/.test(newPassword) },
+    {
+      label: "1 special character",
+      met: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(newPassword),
+    },
+  ];
 
   useEffect(() => {
     if (profile) {
@@ -135,7 +152,6 @@ export default function ProfilePage() {
         </p>
       </div>
 
-      {/* Account Info */}
       <Card>
         <CardHeader>
           <CardTitle>Account Information</CardTitle>
@@ -154,6 +170,7 @@ export default function ProfilePage() {
               </Button>
             </div>
           </div>
+
           {showEmailChange && (
             <div className="flex items-center gap-2 pt-2">
               <Input
@@ -175,17 +192,23 @@ export default function ProfilePage() {
               </Button>
             </div>
           )}
+
           <Separator />
+
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">Username</span>
             <span className="font-medium">{user?.username}</span>
           </div>
+
           <Separator />
+
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">Tier</span>
             <Badge className="capitalize">{user?.tier}</Badge>
           </div>
+
           <Separator />
+
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">
               Email Verified
@@ -197,7 +220,6 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
-      {/* Personal Information */}
       <Card>
         <CardHeader>
           <CardTitle>Personal Information</CardTitle>
@@ -205,6 +227,7 @@ export default function ProfilePage() {
             Update your name, phone, and company details
           </CardDescription>
         </CardHeader>
+
         <CardContent>
           <Form {...profileForm}>
             <form
@@ -225,6 +248,7 @@ export default function ProfilePage() {
                     </FormItem>
                   )}
                 />
+
                 <FormField
                   control={profileForm.control}
                   name="last_name"
@@ -239,6 +263,7 @@ export default function ProfilePage() {
                   )}
                 />
               </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={profileForm.control}
@@ -253,6 +278,7 @@ export default function ProfilePage() {
                     </FormItem>
                   )}
                 />
+
                 <FormField
                   control={profileForm.control}
                   name="company"
@@ -267,6 +293,7 @@ export default function ProfilePage() {
                   )}
                 />
               </div>
+
               <FormField
                 control={profileForm.control}
                 name="timezone"
@@ -280,6 +307,7 @@ export default function ProfilePage() {
                   </FormItem>
                 )}
               />
+
               <Button type="submit" disabled={isSavingProfile}>
                 {isSavingProfile && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -291,7 +319,6 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
-      {/* Change Password */}
       <Card>
         <CardHeader>
           <CardTitle>Change Password</CardTitle>
@@ -299,6 +326,7 @@ export default function ProfilePage() {
             Update your password for added security
           </CardDescription>
         </CardHeader>
+
         <CardContent>
           <Form {...passwordForm}>
             <form
@@ -312,12 +340,29 @@ export default function ProfilePage() {
                   <FormItem>
                     <FormLabel>Current Password</FormLabel>
                     <FormControl>
-                      <Input type="password" {...field} />
+                      <div className="relative">
+                        <Input
+                          type={showOldPassword ? "text" : "password"}
+                          {...field}
+                        />
+                        <button
+                          type="button"
+                          className="absolute right-3 top-1/2 -translate-y-1/2"
+                          onClick={() => setShowOldPassword(!showOldPassword)}
+                        >
+                          {showOldPassword ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+
               <FormField
                 control={passwordForm.control}
                 name="new_password"
@@ -325,12 +370,57 @@ export default function ProfilePage() {
                   <FormItem>
                     <FormLabel>New Password</FormLabel>
                     <FormControl>
-                      <Input type="password" {...field} />
+                      <div className="relative">
+                        <Input
+                          type={showNewPassword ? "text" : "password"}
+                          {...field}
+                        />
+                        <button
+                          type="button"
+                          className="absolute right-3 top-1/2 -translate-y-1/2"
+                          onClick={() => setShowNewPassword(!showNewPassword)}
+                        >
+                          {showNewPassword ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
                     </FormControl>
+
+                    {newPassword.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        {passwordChecks.map((check) => (
+                          <div
+                            key={check.label}
+                            className="flex items-center gap-2 text-xs"
+                          >
+                            {check.met ? (
+                              <Check className="h-3 w-3 text-green-500" />
+                            ) : (
+                              <X className="h-3 w-3 text-muted-foreground" />
+                            )}
+
+                            <span
+                              className={
+                                check.met
+                                  ? "text-green-500"
+                                  : "text-muted-foreground"
+                              }
+                            >
+                              {check.label}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
                     <FormMessage />
                   </FormItem>
                 )}
               />
+
               <FormField
                 control={passwordForm.control}
                 name="confirmPassword"
@@ -338,12 +428,31 @@ export default function ProfilePage() {
                   <FormItem>
                     <FormLabel>Confirm New Password</FormLabel>
                     <FormControl>
-                      <Input type="password" {...field} />
+                      <div className="relative">
+                        <Input
+                          type={showConfirmPassword ? "text" : "password"}
+                          {...field}
+                        />
+                        <button
+                          type="button"
+                          className="absolute right-3 top-1/2 -translate-y-1/2"
+                          onClick={() =>
+                            setShowConfirmPassword(!showConfirmPassword)
+                          }
+                        >
+                          {showConfirmPassword ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+
               <Dialog>
                 <DialogTrigger asChild>
                   <Button type="button">Change Password</Button>

@@ -219,6 +219,26 @@ export const authApi = {
     }).then(res => res.json());
   },
 
+  verifyOtp(data: { email: string; otp: string }) {
+    return apiFetch<ApiResponse<null>>("/auth/verify-otp", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  checkUsername(username: string) {
+    return apiFetch<ApiResponse<{ available: boolean; message: string }>>(
+      `/auth/check-username/${encodeURIComponent(username)}`
+    );
+  },
+
+  resendOtp(data: { email: string }) {
+    return apiFetch<ApiResponse<null>>("/auth/resend-otp", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
   logout() {
     clearTokens();
   },

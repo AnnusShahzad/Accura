@@ -26,7 +26,10 @@ import {
   Shield,
   Plus,
   Zap,
+  User,
+  LogOut,
 } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
 
 const mainNav = [
   { title: "Chat", href: "/chat", icon: MessageSquare },
@@ -35,6 +38,7 @@ const mainNav = [
 
 const settingsNav = [
   { title: "General", href: "/settings", icon: Settings },
+  { title: "Profile", href: "/settings/profile", icon: User },
   { title: "API Keys", href: "/settings/api-keys", icon: Key },
   { title: "MCP Servers", href: "/settings/mcp-servers", icon: Server },
   { title: "Billing", href: "/settings/billing", icon: CreditCard },
@@ -55,6 +59,7 @@ const adminNav = [
 export function AppSidebar() {
   const pathname = usePathname();
   const { user } = useAuthStore();
+  const { logout } = useAuth();
 
   return (
     <Sidebar>
@@ -137,6 +142,22 @@ export function AppSidebar() {
         )}
       </SidebarContent>
 
+      <SidebarFooter >
+        <SidebarMenu>
+                  <SidebarMenuItem key="logout">
+                    <SidebarMenuButton
+                      asChild
+                      isActive={false}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <button type="button" onClick={logout} className="w-full cursor-pointer">
+                        <LogOut className="h-4 w-4" />
+                        <span>Logout</span>
+                      </button>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+              </SidebarMenu>
+      </SidebarFooter>
       <SidebarFooter className="border-t p-4">
         <p className="text-xs text-muted-foreground">
           &copy; {new Date().getFullYear()} Accura AI

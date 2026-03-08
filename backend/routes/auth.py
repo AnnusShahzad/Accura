@@ -4,6 +4,9 @@ POST /api/v1/auth/register
 POST /api/v1/auth/login
 POST /api/v1/auth/refresh
 POST /api/v1/auth/verify-email
+POST /api/v1/auth/verify-otp
+POST /api/v1/auth/resend-otp
+GET  /api/v1/auth/check-username/<username>
 POST /api/v1/auth/change-password
 """
 
@@ -19,7 +22,19 @@ from schemas.auth import (
     LoginRequest,
     RefreshRequest,
     RegisterRequest,
+    ResendOTPRequest,
     VerifyEmailRequest,
+    VerifyOTPRequest,
+)
+from services.auth_service import (
+    change_password,
+    check_username_available,
+    login_user,
+    refresh_tokens,
+    register_user,
+    resend_otp,
+    verify_email,
+    verify_otp,
 )
 from services.auth_service import (
     change_password,
@@ -27,6 +42,8 @@ from services.auth_service import (
     refresh_tokens,
     register_user,
     verify_email,
+    request_password_reset,
+    reset_password,
 )
 from services.auth_service import (
     change_password,
@@ -62,7 +79,10 @@ async def register(request: Request):
     except ValidationError as exc:
         return error(exc.message, status=exc.status_code)
 
-    return success(user, message="Registration successful", status=201)
+    if user.get("already_exists_unverified"):
+        return success(user, message="Account already exists but is not verified. A new verification code has been sent to your email.", status=200)
+
+    return success(user, message="Registration successful. Please check your email for the verification code.", status=201)
 
 
 @bp.post("/login")
@@ -74,7 +94,7 @@ async def login(request: Request):
 
     try:
         tokens = await login_user(email=body.email, password=body.password)
-    except AuthenticationError as exc:
+    except (AuthenticationError, ValidationError) as exc:
         return error(exc.message, status=exc.status_code)
 
     return success(tokens, message="Login successful")
@@ -136,6 +156,42 @@ async def reset_pwd(request: Request):
         return error(exc.message, status=exc.status_code)
 
     return success(message="Password reset successful")
+
+@bp.post("/verify-otp")
+async def verify_otp_route(request: Request):
+    try:
+        body = VerifyOTPRequest(**request.json)
+    except Exception as exc:
+        return error(str(exc), status=422)
+
+    try:
+        await verify_otp(email=body.email, otp=body.otp)
+    except (AuthenticationError, ValidationError) as exc:
+        return error(exc.message, status=exc.status_code)
+
+    return success(message="Email verified successfully")
+
+
+@bp.post("/resend-otp")
+async def resend_otp_route(request: Request):
+    try:
+        body = ResendOTPRequest(**request.json)
+    except Exception as exc:
+        return error(str(exc), status=422)
+
+    try:
+        await resend_otp(email=body.email)
+    except (AuthenticationError, ValidationError) as exc:
+        return error(exc.message, status=exc.status_code)
+
+    return success(message="Verification code sent")
+
+
+@bp.get("/check-username/<username:str>")
+async def check_username(request: Request, username: str):
+    result = await check_username_available(username)
+    return success(result)
+
 
 @bp.post("/change-password")
 @require_auth

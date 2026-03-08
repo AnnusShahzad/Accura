@@ -1,6 +1,7 @@
 "use client";
 
 import { useForm } from "react-hook-form";
+import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { settingsSchema, type SettingsFormData } from "@/lib/validations";
 import { useSettings, useUpdateSettings } from "@/hooks/use-settings";
@@ -41,6 +42,7 @@ export default function SettingsPage() {
   const { data: settings, isLoading } = useSettings();
   const { setTheme } = useTheme();
   const updateSettings = useUpdateSettings();
+  const [formReady, setFormReady] = useState(false);
 
   const form = useForm<SettingsFormData>({
     resolver: zodResolver(settingsSchema),
@@ -58,27 +60,27 @@ export default function SettingsPage() {
   });
 
   useEffect(() => {
-    if (settings) {
-      form.reset({
-        global_threshold: settings.global_threshold,
-        max_iterations: settings.max_iterations,
-        timeout_seconds: settings.timeout_seconds,
-        hide_evaluator_scoring: settings.hide_evaluator_scoring,
-        preferred_generator_model: settings.preferred_generator_model,
-        preferred_evaluator_model: settings.preferred_evaluator_model,
-        preferred_critic_model: settings.preferred_critic_model,
-        dark_mode: settings.dark_mode,
-        search_enabled: settings.search_enabled,
-      });
-    }
+    if (settings == undefined) return;
+    form.reset({
+      global_threshold: settings.global_threshold,
+      max_iterations: settings.max_iterations,
+      timeout_seconds: settings.timeout_seconds,
+      hide_evaluator_scoring: settings.hide_evaluator_scoring,
+      preferred_generator_model: settings?.preferred_generator_model,
+      preferred_evaluator_model: settings?.preferred_evaluator_model,
+      preferred_critic_model: settings?.preferred_critic_model,
+      dark_mode: settings?.dark_mode,
+      search_enabled: settings?.search_enabled,
+    });
+    setFormReady(true);
   }, [settings, form]);
 
   const onSubmit = (data: SettingsFormData) => {
-    updateSettings.mutate(data);
     setTheme(data.dark_mode ? "dark" : "light");
+    updateSettings.mutate(data);
   };
 
-  if (isLoading) {
+  if (isLoading || !formReady) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-8 w-48" />
@@ -225,7 +227,7 @@ export default function SettingsPage() {
                       <FormLabel>Generator</FormLabel>
                       <Select
                         onValueChange={field.onChange}
-                        value={field.value}
+                        defaultValue={field.value}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -251,7 +253,7 @@ export default function SettingsPage() {
                       <FormLabel>Evaluator</FormLabel>
                       <Select
                         onValueChange={field.onChange}
-                        value={field.value}
+                        defaultValue={field.value}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -277,7 +279,7 @@ export default function SettingsPage() {
                       <FormLabel>Critic</FormLabel>
                       <Select
                         onValueChange={field.onChange}
-                        value={field.value}
+                        defaultValue={field.value}
                       >
                         <FormControl>
                           <SelectTrigger>

@@ -16,6 +16,7 @@ export const AI_MODELS = [
   { value: "deepseek-v3", label: "DeepSeek V3", provider: "deepseek" },
   { value: "deepseek-ai/deepseek-v3.2", label: "DeepSeek V3.2", provider: "deepseek" },
   { value: "minimaxai/minimax-m2.5", label: "Minimax M2.5", provider: "minimax" },
+  { value: "openai/gpt-oss-120b", label: "ChatGPT 120B OSS", provider: "openai"}
 ] as const;
 
 // ─── AI Providers ───

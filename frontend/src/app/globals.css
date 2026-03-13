@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "../../node_modules/tw-animate-css/dist/tw-animate.css";
 @import "../../node_modules/shadcn/dist/tailwind.css";
+@import "../../node_modules/katex/dist/katex.min.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -122,5 +123,17 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+
+  .prose .katex-display {
+    margin-top: 1.25rem;
+    margin-bottom: 1.25rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 0.25rem;
+  }
+
+  .prose .katex {
+    font-size: 1.03em;
   }
 }

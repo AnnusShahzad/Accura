@@ -12,7 +12,6 @@ import { formatDate, formatNumber } from "@/lib/utils";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -40,6 +39,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { ResponseViewer } from "@/components/ui/response-viewer";
 import {
   Loader2,
   Pencil,
@@ -227,10 +227,12 @@ export default function ChatDetailPage({
               <Progress value={conversation.best_score} className="mt-2" />
             )}
           </CardHeader>
-          <CardContent>
-            <div className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-wrap">
-              {conversation.best_response}
-            </div>
+          <CardContent className="px-5 pb-6 sm:px-8 sm:pb-8">
+            <ResponseViewer
+              content={conversation.best_response}
+              title="Best Response"
+              previewHeight={360}
+            />
           </CardContent>
         </Card>
       )}
@@ -439,9 +441,12 @@ export default function ChatDetailPage({
                         <p className="text-xs font-medium text-muted-foreground">
                           Response:
                         </p>
-                        <p className="mt-1 whitespace-pre-wrap text-sm">
-                          {iter.response}
-                        </p>
+                        <ResponseViewer
+                          content={iter.response}
+                          title={`Iteration #${iter.iteration_number} Response`}
+                          className="mt-2"
+                          previewHeight={280}
+                        />
                       </div>
                       {!hideScoring && iter.evaluation_reasoning && (
                         <>

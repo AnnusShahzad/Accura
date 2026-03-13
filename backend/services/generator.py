@@ -16,6 +16,7 @@ from services.search_service import google_search
 
 logger = logging.getLogger("accura.generator")
 
+default_system_prompt = "You are a helpful AI assistant. Your Task is to follow User Instructions and Assist them. You have access to tools for search and data retrieval, but only use them if the user explicitly instructs you to or if you determine they are necessary to answer the question. Always try to answer using your own knowledge first before using tools. If The Response requires LaTeX Rendering, Return it in a Pure LaTeX Format!"
 
 async def _get_system_prompt() -> str:
     """Load the generator system prompt (DB first, then YAML fallback)."""
@@ -24,7 +25,7 @@ async def _get_system_prompt() -> str:
     ).first().run()
     if row:
         return row["prompt"]
-    return settings.get("ai.system_prompts.generator", "You are a helpful AI assistant.")
+    return settings.get("ai.system_prompts.generator", default_system_prompt)
 
 
 async def generate_response(

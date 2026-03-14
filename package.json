@@ -1,0 +1,27 @@
+{
+  "name": "accura-monorepo",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n BACKEND,FRONTEND -c blue,green \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "python backend/app.py",
+    "dev:frontend": "npm run dev --workspace frontend",
+    "build": "npm run build:frontend",
+    "build:frontend": "npm run build --workspace frontend",
+    "start": "concurrently -k -n BACKEND,FRONTEND -c blue,green \"npm run start:backend\" \"npm run start:frontend\"",
+    "start:backend": "python backend/app.py",
+    "start:frontend": "npm run start --workspace frontend",
+    "lint": "npm run lint --workspace frontend",
+    "setup": "npm run setup:frontend && npm run setup:backend",
+    "setup:frontend": "npm install --workspace frontend",
+    "setup:backend": "python -m pip install -r backend/requirements.txt",
+    "dev:infra": "docker compose -f backend/docker-compose.yml up -d postgres redis",
+    "stop:infra": "docker compose -f backend/docker-compose.yml down"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

@@ -47,6 +47,62 @@ accura/
     └── stores/          # Zustand stores
 ```
 
+## Monorepo Commands (Root)
+
+The repository now supports running backend and frontend from the root as a single workspace.
+
+### Prerequisites
+
+- Python 3.11+
+- Node.js 20+
+- Docker (optional, for Postgres + Redis)
+
+### 1. Install Dependencies
+
+From the repository root:
+
+```bash
+npm install
+```
+
+Then install backend Python dependencies (use your active virtual environment):
+
+```bash
+npm run setup:backend
+```
+
+Or run both setup steps:
+
+```bash
+npm run setup
+```
+
+### 2. Start Local Infra (Optional)
+
+```bash
+npm run dev:infra
+```
+
+This starts PostgreSQL + Redis from `backend/docker-compose.yml`.
+
+### 3. Run Both Apps With One Command
+
+```bash
+npm run dev
+```
+
+This launches:
+- Backend: `http://localhost:8000`
+- Frontend: `http://localhost:3000`
+
+### 4. Other Root Scripts
+
+- `npm run dev:backend` – run only backend
+- `npm run dev:frontend` – run only frontend
+- `npm run build` – build frontend
+- `npm run lint` – lint frontend
+- `npm run stop:infra` – stop infra services
+
 ## Setup
 
 ### Prerequisites

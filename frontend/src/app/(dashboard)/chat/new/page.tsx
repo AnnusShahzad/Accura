@@ -110,7 +110,7 @@ export default function NewChatPage() {
                     <FormLabel>Title (Optional)</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="Give your conversation a name"
+                        placeholder="Auto-generated if left empty"
                         {...field}
                       />
                     </FormControl>

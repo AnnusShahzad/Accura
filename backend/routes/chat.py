@@ -103,11 +103,15 @@ async def list_conversations(request: Request):
     offset = (page - 1) * per_page
 
     conversations = await Conversation.select().where(
-        (Conversation.user == user_id) & (Conversation.is_temporary == False)
+        (Conversation.user == user_id)
+        & (Conversation.is_temporary == False)
+        & (Conversation.status != "archived")
     ).order_by(Conversation.created_at, ascending=False).limit(per_page).offset(offset).run()
 
     total = await Conversation.count().where(
-        (Conversation.user == user_id) & (Conversation.is_temporary == False)
+        (Conversation.user == user_id)
+        & (Conversation.is_temporary == False)
+        & (Conversation.status != "archived")
     ).run()
 
     return paginated(conversations, total, page, per_page)
@@ -212,7 +216,7 @@ async def delete_conversation(request: Request, conversation_id: str):
         (Conversation.id == conversation_id) & (Conversation.user == user_id)
     ).run()
 
-    return success(message="Conversation archived")
+    return success(message="Conversation deleted")
 
 
 @bp.get("/<conversation_id:str>/iterations")

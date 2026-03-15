@@ -286,6 +286,28 @@ async def orchestrate_conversation(
         metadata={"conversation_id": conversation_id},
     )
 
+    # Auto-generate title if user didn't provide one
+    current_title = conversation.get("title", "")
+    logger.info("Current title for %s: %r", conversation_id, current_title)
+    if current_title in ("", "New Conversation"):
+        from services.title_generator import generate_title
+
+        # Use the first generator agent (proven to work - it produced the response)
+        gen_agent = agents[0] if agents else None
+        title_provider = gen_agent["provider"] if gen_agent else eval_provider
+        title_model = gen_agent["model"] if gen_agent else eval_model
+
+        try:
+            auto_title = await generate_title(
+                user_id, title_provider, title_model, conversation["prompt"]
+            )
+            logger.info("Auto-generated title for %s: %r", conversation_id, auto_title)
+            await Conversation.update({
+                Conversation.title: auto_title,
+            }).where(Conversation.id == conversation_id).run()
+        except Exception:
+            logger.exception("Auto title generation failed for %s", conversation_id)
+
     return {
         "conversation_id": conversation_id,
         "best_response": best_overall["best_response"],
@@ -294,3 +316,4 @@ async def orchestrate_conversation(
         "tokens_output": total_out,
         "status": "completed",
     }
+

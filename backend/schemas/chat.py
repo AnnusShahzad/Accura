@@ -27,6 +27,11 @@ class RenameConversationRequest(BaseModel):
     title: str = Field(min_length=1, max_length=500)
 
 
+class FollowUpMessageRequest(BaseModel):
+    """Send a follow-up message in an existing conversation."""
+    prompt: str = Field(min_length=1)
+
+
 class AddAgentRequest(BaseModel):
     """Add a new AI agent mid-conversation."""
     provider: str

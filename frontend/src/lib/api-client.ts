@@ -16,6 +16,8 @@ import type {
   RenameConversationRequest,
   AddAgentRequest,
   Iteration,
+  ChatMessage,
+  FollowUpMessageRequest,
   UserSettings,
   UpdateSettingsRequest,
   APIKey,
@@ -315,6 +317,17 @@ export const chatApi = {
 
   getTokens(id: string) {
     return apiFetch<ApiResponse<TokenUsage>>(`/chat/${id}/tokens`);
+  },
+
+  getMessages(id: string) {
+    return apiFetch<ApiResponse<ChatMessage[]>>(`/chat/${id}/messages`);
+  },
+
+  sendMessage(id: string, data: FollowUpMessageRequest) {
+    return apiFetch<ApiResponse<Conversation>>(`/chat/${id}/message`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
   },
 };
 

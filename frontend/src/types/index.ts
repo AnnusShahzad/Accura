@@ -120,6 +120,20 @@ export interface Iteration {
   created_at: string;
 }
 
+export interface ChatMessage {
+  id: string;
+  conversation_id: string;
+  role: "user" | "assistant" | "system" | "evaluator";
+  content: string;
+  score?: number | null;
+  metadata?: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface FollowUpMessageRequest {
+  prompt: string;
+}
+
 export interface Conversation {
   id: string;
   title: string;
@@ -131,9 +145,18 @@ export interface Conversation {
   tokens_output: number;
   search_enabled: boolean;
   is_temporary: boolean;
+  threshold?: number | null;
+  max_iterations?: number | null;
+  timeout_seconds?: number | null;
   created_at: string;
   agents: ChatAgent[];
   iterations: Iteration[];
+  messages: ChatMessage[];
+  metadata?: {
+    current_iteration?: number;
+    current_best_score?: number;
+    max_iterations?: number;
+  };
 }
 
 export interface ConversationListItem {

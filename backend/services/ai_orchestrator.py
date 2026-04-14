@@ -150,6 +150,15 @@ async def _run_single_agent_loop(
             best_score = score
             best_response = response_text
 
+        # --- Emit live progress into conversation metadata ---
+        await Conversation.update({
+            Conversation.metadata: {
+                "current_iteration": iteration_num,
+                "current_best_score": round(float(best_score), 2),
+                "max_iterations": max_iterations,
+            },
+        }).where(Conversation.id == conversation_id).run()
+
         # --- Check threshold ---
         if score >= threshold:
             logger.info("Threshold met: %.2f >= %.2f", score, threshold)

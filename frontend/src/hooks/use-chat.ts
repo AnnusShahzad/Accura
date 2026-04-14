@@ -130,13 +130,33 @@ export function useConversationIterations(id: string) {
   });
 }
 
-export function useConversationTokens(id: string) {
+export function useConversationMessages(id: string) {
   return useQuery({
-    queryKey: ["conversation-tokens", id],
+    queryKey: ["conversation-messages", id],
     queryFn: async () => {
-      const res = await chatApi.getTokens(id);
+      const res = await chatApi.getMessages(id);
       return res.data;
     },
     enabled: !!id,
+    // Always poll when id is set; the conversation hook drives when to stop
+    refetchInterval: 3000,
+    staleTime: 0,
+  });
+}
+
+export function useSendFollowUpMessage() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, prompt }: { id: string; prompt: string }) =>
+      chatApi.sendMessage(id, { prompt }),
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: ["conversation", id] });
+      queryClient.invalidateQueries({ queryKey: ["conversation-messages", id] });
+      toast.success("Message sent!");
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to send message");
+    },
   });
 }

@@ -19,7 +19,7 @@ from sanic import Blueprint, Request
 from middleware.auth_middleware import require_auth
 from models.chat import ChatAgent, ChatMessage, Conversation, Iteration
 from models.settings import UserSettings
-from schemas.chat import AddAgentRequest, CreateConversationRequest, RenameConversationRequest
+from schemas.chat import AddAgentRequest, CreateConversationRequest, FollowUpMessageRequest, RenameConversationRequest
 from services.ai_orchestrator import orchestrate_conversation
 from services.token_tracker import get_conversation_token_usage
 from utils.responses import error, paginated, success
@@ -250,3 +250,67 @@ async def conversation_tokens(request: Request, conversation_id: str):
 
     usage = await get_conversation_token_usage(conversation_id)
     return success(usage)
+
+
+@bp.get("/<conversation_id:str>/messages")
+@require_auth
+async def list_messages(request: Request, conversation_id: str):
+    """Return full ordered message history for a conversation."""
+    user_id = str(request.ctx.user["id"])
+
+    conv = await Conversation.select(Conversation.id).where(
+        (Conversation.id == conversation_id) & (Conversation.user == user_id)
+    ).first().run()
+    if not conv:
+        return error("Conversation not found", status=404)
+
+    messages = await ChatMessage.select().where(
+        ChatMessage.conversation == conversation_id
+    ).order_by(ChatMessage.created_at).run()
+
+    return success(messages)
+
+
+@bp.post("/<conversation_id:str>/message")
+@require_auth
+async def send_followup_message(request: Request, conversation_id: str):
+    """Append a follow-up user message to an existing conversation and re-run orchestration."""
+    try:
+        body = FollowUpMessageRequest(**request.json)
+    except Exception as exc:
+        return error(str(exc), status=422)
+
+    user_id = str(request.ctx.user["id"])
+
+    conv = await Conversation.select().where(
+        (Conversation.id == conversation_id) & (Conversation.user == user_id)
+    ).first().run()
+    if not conv:
+        return error("Conversation not found", status=404)
+    if conv["status"] == "archived":
+        return error("Cannot message an archived conversation", status=400)
+
+    # Store the new user message
+    await ChatMessage.insert(
+        ChatMessage(
+            id=str(uuid.uuid4()),
+            conversation=conversation_id,
+            role="user",
+            content=body.prompt,
+        )
+    ).run()
+
+    # Update the conversation prompt to the new message and reset status
+    await Conversation.update({
+        Conversation.prompt: body.prompt,
+        Conversation.status: "active",
+        Conversation.best_response: "",
+        Conversation.best_score: 0,
+    }).where(Conversation.id == conversation_id).run()
+
+    # Fire-and-forget new orchestration cycle
+    request.app.add_task(orchestrate_conversation(conversation_id, user_id))
+
+    conv = await Conversation.select().where(Conversation.id == conversation_id).first().run()
+    return success(conv, message="Follow-up sent – processing", status=201)
+

@@ -30,6 +30,7 @@ class RenameConversationRequest(BaseModel):
 class FollowUpMessageRequest(BaseModel):
     """Send a follow-up message in an existing conversation."""
     prompt: str = Field(min_length=1)
+    search_enabled: Optional[bool] = None
 
 
 class AddAgentRequest(BaseModel):

@@ -148,8 +148,8 @@ export function useSendFollowUpMessage() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, prompt }: { id: string; prompt: string }) =>
-      chatApi.sendMessage(id, { prompt }),
+    mutationFn: ({ id, prompt, search_enabled }: { id: string; prompt: string; search_enabled?: boolean }) =>
+      chatApi.sendMessage(id, { prompt, search_enabled }),
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ["conversation", id] });
       queryClient.invalidateQueries({ queryKey: ["conversation-messages", id] });

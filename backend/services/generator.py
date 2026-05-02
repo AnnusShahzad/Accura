@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 import time
+import datetime
 
 from config import settings
 from models.admin import SystemPrompt
@@ -58,14 +59,27 @@ async def generate_response(
     start = time.monotonic()
 
     system_prompt = await _get_system_prompt()
-    extra_context_parts: list[str] = []
+    
+    # Inject current date awareness
+    now = datetime.datetime.now()
+    date_str = now.strftime("%A, %B %d, %Y")
+    date_context = f"Current Date: {date_str}. Use this to evaluate what information is 'recent' or 'latest'."
+    
+    extra_context_parts: list[str] = [date_context]
     search_results: list[dict] = []
     mcp_results: list[dict] = []
 
     # --- Search augmentation ---
     if search_enabled and search_query:
         try:
-            search_results = await google_search(search_query, num_results=5)
+            # Heuristic: if query mentions "latest", "new", current year, etc., restrict to recent results
+            recent_keywords = ["new", "latest", "recent", "launch", "released", "update", "2026", "today", "generation", "gen"]
+            date_restrict = None
+            if any(kw in search_query.lower() for kw in recent_keywords):
+                date_restrict = "m3"  # Past 3 months for highly relevant recent info
+                logger.info("Applying date restriction 'm3' for query: %s", search_query)
+            
+            search_results = await google_search(search_query, num_results=5, date_restrict=date_restrict)
             if search_results:
                 ctx = "\n".join(
                     f"- [{r['title']}]({r['url']}): {r['snippet']}" for r in search_results

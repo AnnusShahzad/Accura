@@ -33,7 +33,7 @@ def _domain_allowed(url: str, whitelist: set[str], blacklist: set[str]) -> bool:
     return True
 
 
-async def google_search(query: str, num_results: int = 5) -> list[dict]:
+async def google_search(query: str, num_results: int = 5, date_restrict: str | None = None) -> list[dict]:
     """Perform a Google Custom Search and return filtered results."""
 
     api_key = settings.get("search.google_api_key", "")
@@ -58,6 +58,8 @@ async def google_search(query: str, num_results: int = 5) -> list[dict]:
         "q": query,
         "num": min(num_results, 10),
     }
+    if date_restrict:
+        params["dateRestrict"] = date_restrict
 
     try:
         async with httpx.AsyncClient(timeout=15) as client:

@@ -301,12 +301,16 @@ async def send_followup_message(request: Request, conversation_id: str):
     ).run()
 
     # Update the conversation prompt to the new message and reset status
-    await Conversation.update({
+    update_data = {
         Conversation.prompt: body.prompt,
         Conversation.status: "active",
         Conversation.best_response: "",
         Conversation.best_score: 0,
-    }).where(Conversation.id == conversation_id).run()
+    }
+    if body.search_enabled is not None:
+        update_data[Conversation.search_enabled] = body.search_enabled
+
+    await Conversation.update(update_data).where(Conversation.id == conversation_id).run()
 
     # Fire-and-forget new orchestration cycle
     request.app.add_task(orchestrate_conversation(conversation_id, user_id))

@@ -24,6 +24,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -222,6 +223,7 @@ export default function ChatDetailPage({
   const [newAgentModel, setNewAgentModel] = useState("");
   const [newAgentProvider, setNewAgentProvider] = useState("");
   const [followUpText, setFollowUpText] = useState("");
+  const [searchEnabled, setSearchEnabled] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -272,7 +274,8 @@ export default function ChatDetailPage({
     const text = followUpText.trim();
     if (!text || sendFollowUp.isPending) return;
     setFollowUpText("");
-    sendFollowUp.mutate({ id, prompt: text });
+    sendFollowUp.mutate({ id, prompt: text, search_enabled: searchEnabled });
+    setSearchEnabled(false);
   };
 
   // Build the displayed messages: if the API returned messages use those,
@@ -331,6 +334,10 @@ export default function ChatDetailPage({
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          <Badge variant="outline" className="gap-1 text-xs">
+            <Coins className="h-3 w-3" />
+            {formatNumber((conversation.tokens_input || 0) + (conversation.tokens_output || 0))} Tokens
+          </Badge>
           {isActive && (
             <Badge variant="secondary" className="gap-1">
               <Loader2 className="h-3 w-3 animate-spin" />
@@ -450,8 +457,15 @@ export default function ChatDetailPage({
             AI is generating a response… input unlocks when complete.
           </div>
         ) : (
-          <div className="flex items-end gap-2">
-            <Textarea
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2 px-1">
+              <Switch checked={searchEnabled} onCheckedChange={setSearchEnabled} id="web-search-toggle" />
+              <label htmlFor="web-search-toggle" className="text-xs font-medium cursor-pointer flex items-center gap-1">
+                <Search className="h-3 w-3" /> Web Search
+              </label>
+            </div>
+            <div className="flex items-end gap-2">
+              <Textarea
               value={followUpText}
               onChange={(e) => setFollowUpText(e.target.value)}
               onKeyDown={(e) => {
@@ -477,6 +491,7 @@ export default function ChatDetailPage({
                 <Send className="h-4 w-4" />
               )}
             </Button>
+            </div>
           </div>
         )}
       </div>

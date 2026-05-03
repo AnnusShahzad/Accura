@@ -132,6 +132,7 @@ export interface ChatMessage {
 
 export interface FollowUpMessageRequest {
   prompt: string;
+  search_enabled?: boolean;
 }
 
 export interface Conversation {

@@ -3,7 +3,11 @@
 import { Zap, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useAuthStore } from "@/stores/auth-store";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+
+// Links from emails must work whether or not the user is logged in:
+// confirming a new email address in particular is done while logged in.
+const ALLOW_AUTHENTICATED = ["/email-change", "/reset-password", "/verify-email"];
 import { useEffect } from "react";
 
 export default function AuthLayout({
@@ -13,12 +17,15 @@ export default function AuthLayout({
 }) {
   const { isAuthenticated, isLoading } = useAuthStore();
   const router = useRouter();
+  const pathname = usePathname();
+  const allowed = ALLOW_AUTHENTICATED.some((p) => pathname.startsWith(p));
+  const redirectAway = isAuthenticated && !allowed;
 
   useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      router.push("/chat");
+    if (!isLoading && redirectAway) {
+      router.replace("/chat");
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [redirectAway, isLoading, router]);
 
   if (isLoading) {
     return (
@@ -28,7 +35,7 @@ export default function AuthLayout({
     );
   }
 
-  if (isAuthenticated) return null;
+  if (redirectAway) return null;
 
   return (
     <div className="flex min-h-screen">

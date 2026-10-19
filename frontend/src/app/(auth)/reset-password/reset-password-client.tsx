@@ -15,7 +15,10 @@ export default function ResetPasswordClient() {
   const [showPassword, setShowPassword] = useState(false);
 
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">(
-    "idle"
+    token ? "idle" : "error"
+  );
+  const [errorMessage, setErrorMessage] = useState(
+    token ? "" : "This reset link is missing its token. Request a new one."
   );
 
   // SAME password validation checks as register page
@@ -34,6 +37,7 @@ export default function ResetPasswordClient() {
 
   const handleSubmit = async () => {
     if (!token || !password || !isPasswordValid) {
+      setErrorMessage(token ? "Password requirements not met" : "This reset link is missing its token.");
       setStatus("error");
       return;
     }
@@ -42,7 +46,10 @@ export default function ResetPasswordClient() {
       setStatus("loading");
       await authApi.resetPassword(token, password);
       setStatus("success");
-    } catch {
+    } catch (e) {
+      setErrorMessage(
+        e instanceof Error ? e.message : "This reset link is invalid or has expired."
+      );
       setStatus("error");
     }
   };
@@ -114,9 +121,12 @@ export default function ResetPasswordClient() {
             </Button>
 
             {status === "error" && (
-              <p className="text-red-500 text-sm text-center">
-                Invalid token or password requirements not met
-              </p>
+              <div className="space-y-1 text-center text-sm">
+                <p className="text-red-500">{errorMessage}</p>
+                <a href="/forgot-password" className="text-primary underline-offset-4 hover:underline">
+                  Request a new reset link
+                </a>
+              </div>
             )}
           </>
         ) : (

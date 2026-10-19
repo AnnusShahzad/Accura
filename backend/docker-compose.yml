@@ -1,8 +1,6 @@
 # =============================================================================
 # Accura – Docker Compose (Development / Self-hosted)
 # =============================================================================
-version: "3.9"
-
 services:
   # --- PostgreSQL ---
   postgres:
@@ -40,7 +38,9 @@ services:
     env_file:
       - .env
     environment:
+      DB_ENGINE: postgres
       DB_HOST: postgres
+      DB_PORT: 5432
       REDIS_URL: redis://redis:6379/0
       ACCURA_CONFIG_PATH: /app/config.yaml
     ports:
@@ -53,24 +53,6 @@ services:
     volumes:
       - .:/app
     restart: unless-stopped
-
-  # --- Database Migrations ---
-  migrate:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    env_file:
-      - .env
-    environment:
-      DB_HOST: postgres
-    command: >
-      sh -c "
-        piccolo migrations forwards accura &&
-        echo 'Migrations complete'
-      "
-    depends_on:
-      postgres:
-        condition: service_healthy
 
 volumes:
   postgres_data:

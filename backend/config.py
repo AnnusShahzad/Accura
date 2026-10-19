@@ -48,6 +48,9 @@ def _env_overrides() -> dict:
         ("APP_WORKERS", "app.workers", int),
         ("APP_SECRET_KEY", "app.secret_key", str),
         ("APP_FRONTEND_URL", "app.frontend_url", str),
+        ("APP_CORS_ORIGINS", "app.cors_origins", str),
+        ("DB_ENGINE", "database.engine", str),
+        ("DB_SQLITE_PATH", "database.sqlite_path", str),
         ("DB_HOST", "database.host", str),
         ("DB_PORT", "database.port", int),
         ("DB_NAME", "database.name", str),
@@ -67,19 +70,32 @@ def _env_overrides() -> dict:
         ("SMTP_FROM_EMAIL", "smtp.from_email", str),
         ("SMTP_USE_TLS", "smtp.use_tls", lambda v: v.lower() in ("true", "1", "yes")),
         ("OPENAI_API_KEY", "ai.providers.openai.api_key", str),
+        ("OPENAI_BASE_URL", "ai.providers.openai.base_url", str),
         ("DEEPSEEK_API_KEY", "ai.providers.deepseek.api_key", str),
+        ("DEEPSEEK_BASE_URL", "ai.providers.deepseek.base_url", str),
+        ("ANTHROPIC_API_KEY", "ai.providers.anthropic.api_key", str),
+        ("GOOGLE_AI_API_KEY", "ai.providers.google.api_key", str),
+        ("CUSTOM_AI_API_KEY", "ai.providers.custom.api_key", str),
+        ("CUSTOM_AI_BASE_URL", "ai.providers.custom.base_url", str),
+        ("DEFAULT_GENERATOR_MODEL", "ai.default_generator_model", str),
+        ("DEFAULT_EVALUATOR_MODEL", "ai.default_evaluator_model", str),
+        ("DEFAULT_REPROMPT_MODEL", "ai.default_reprompt_model", str),
         ("ENCRYPTION_KEY", "security.encryption_key", str),
         ("GOOGLE_API_KEY", "search.google_api_key", str),
         ("GOOGLE_CSE_ID", "search.google_cse_id", str),
         ("STRIPE_SECRET_KEY", "billing.stripe_secret_key", str),
         ("STRIPE_WEBHOOK_SECRET", "billing.stripe_webhook_secret", str),
+        ("STRIPE_PRICE_PRO_MONTHLY", "billing.stripe_price_ids.pro_monthly", str),
+        ("STRIPE_PRICE_PRO_YEARLY", "billing.stripe_price_ids.pro_yearly", str),
+        ("SUPPORT_EMAIL", "branding.support_email", str),
         ("COMPANY_NAME", "branding.company_name", str),
         ("COMPANY_LOGO_URL", "branding.logo_url", str),
     ]
     overrides: dict[str, Any] = {}
     for env_key, config_path, cast in mapping:
         value = os.getenv(env_key)
-        if value is not None:
+        # Treat "FOO=" in a .env file as unset rather than crashing on int("")
+        if value is not None and value != "":
             parts = config_path.split(".")
             ref = overrides
             for part in parts[:-1]:
@@ -89,17 +105,26 @@ def _env_overrides() -> dict:
 
 
 class _Settings:
-    """Singleton settings container with attribute access."""
+    """Singleton settings container with attribute access.
+
+    Values are layered: config.yaml < environment variables < runtime
+    overrides (admin_config table, applied via ``apply_overrides``).
+    """
 
     _instance: _Settings | None = None
+    _base: dict[str, Any] = {}
+    _overrides: dict[str, Any] = {}
     _data: dict[str, Any] = {}
 
     def __new__(cls) -> _Settings:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
-            base = _load_yaml(_CONFIG_PATH)
-            cls._instance._data = _deep_merge(base, _env_overrides())
+            cls._instance._load()
         return cls._instance
+
+    def _load(self) -> None:
+        self._base = _deep_merge(_load_yaml(_CONFIG_PATH), _env_overrides())
+        self._data = _deep_merge(self._base, self._overrides)
 
     def get(self, dotted_key: str, default: Any = None) -> Any:
         """Retrieve a nested value via dot-separated key."""
@@ -117,10 +142,21 @@ class _Settings:
     def as_dict(self) -> dict:
         return self._data.copy()
 
+    def apply_overrides(self, overrides: dict[str, Any]) -> None:
+        """Replace the runtime override layer with ``{"dotted.key": value}``."""
+        nested: dict[str, Any] = {}
+        for dotted_key, value in overrides.items():
+            parts = dotted_key.split(".")
+            ref = nested
+            for part in parts[:-1]:
+                ref = ref.setdefault(part, {})
+            ref[parts[-1]] = value
+        self._overrides = nested
+        self._data = _deep_merge(self._base, nested)
+
     def reload(self) -> None:
         """Hot-reload configuration (useful for admin changes)."""
-        base = _load_yaml(_CONFIG_PATH)
-        self._data = _deep_merge(base, _env_overrides())
+        self._load()
 
 
 settings = _Settings()

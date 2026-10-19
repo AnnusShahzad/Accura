@@ -5,12 +5,14 @@ Accura – Main Application Entry Point
 from __future__ import annotations
 
 import logging
-import os
 
+from piccolo.engine.sqlite import SQLiteEngine
 from sanic import Sanic, json as sanic_json
 from sanic.request import Request
 
 from config import settings
+from models.chat import Conversation
+from utils.db_schema import ensure_schema
 from middleware.auth_middleware import auth_middleware
 from middleware.rate_limiter import rate_limit_middleware
 from routes.admin import bp as admin_bp
@@ -102,51 +104,19 @@ def create_app() -> Sanic:
     @app.before_server_start
     async def startup(app_instance):
         logger.info("Accura backend starting – %s", settings.get("app.environment"))
-        await _create_tables()
+        engine = Conversation._meta.db
+        if not isinstance(engine, SQLiteEngine):
+            await engine.start_connection_pool()
+        await ensure_schema()
         await _seed_subscription_plans()
 
+    @app.after_server_stop
+    async def shutdown(app_instance):
+        engine = Conversation._meta.db
+        if not isinstance(engine, SQLiteEngine):
+            await engine.close_connection_pool()
+
     return app
-
-
-async def _create_tables():
-    """Create all database tables if they don't exist (dev / SQLite)."""
-    from models.user import User, UserProfile
-    from models.subscription import SubscriptionPlan, Subscription, Transaction
-    from models.chat import Conversation, ChatAgent, Iteration, ChatMessage
-    from models.settings import UserSettings
-    from models.mcp_server import MCPServer
-    from models.notification import Notification, NotificationPreference
-    from models.admin import AdminConfig, SystemPrompt, DomainRule
-    from models.api_key import UserAPIKey
-    from models.contact import ContactRequest
-
-    tables = [
-        User,
-        UserProfile,
-        SubscriptionPlan,
-        Subscription,
-        Transaction,
-        Conversation,
-        ChatAgent,
-        Iteration,
-        ChatMessage,
-        UserSettings,
-        MCPServer,
-        Notification,
-        NotificationPreference,
-        AdminConfig,
-        SystemPrompt,
-        DomainRule,
-        UserAPIKey,
-        ContactRequest,
-    ]
-
-    for table_cls in tables:
-        try:
-            await table_cls.create_table(if_not_exists=True).run()
-        except Exception as exc:
-            logger.warning("Table creation note (%s): %s", table_cls.__name__, exc)
-    logger.info("Database tables ensured.")
 
 
 async def _seed_subscription_plans():
@@ -187,9 +157,11 @@ async def _seed_subscription_plans():
 app = create_app()
 
 if __name__ == "__main__":
+    workers = max(1, int(settings.get("app.workers", 1)))
     app.run(
         host=settings.get("app.host", "0.0.0.0"),
-        port=settings.get("app.port", 8000),
-        debug=settings.get("app.debug", True),
-        single_process=True,
+        port=int(settings.get("app.port", 8000)),
+        debug=bool(settings.get("app.debug", False)),
+        workers=workers,
+        single_process=workers == 1,
     )

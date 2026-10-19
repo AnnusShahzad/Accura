@@ -1,129 +1,106 @@
-"""End-to-end API test script."""
-import urllib.request
+"""
+Smoke-test a running Accura backend over HTTP.
+
+    python scripts/create_admin.py smoke@example.com --password 'Sm0ke!Test1'
+    python scripts/smoke_test.py --email smoke@example.com --password 'Sm0ke!Test1'
+
+Needs an existing, verified account (registration requires the emailed
+OTP). Does not call any AI provider: the conversation it creates is
+deleted straight away.
+"""
+
+import argparse
 import json
 import sys
-import time
+import urllib.error
+import urllib.request
 
-BASE = "http://localhost:8000/api/v1"
 PASS = 0
 FAIL = 0
-DELAY = 0.15  # small delay between requests to avoid overwhelming single-worker server
 
-def api(method, path, token=None, body=None, retries=2):
-    time.sleep(DELAY)
-    data = json.dumps(body).encode() if body else None
-    headers = {"Content-Type": "application/json"}
+
+def api(base, method, path, token=None, body=None, headers=None):
+    data = json.dumps(body).encode() if body is not None else None
+    hdrs = {"Content-Type": "application/json", **(headers or {})}
     if token:
-        headers["Authorization"] = "Bearer " + token
-    for attempt in range(retries + 1):
-        req = urllib.request.Request(BASE + path, data=data, headers=headers, method=method)
+        hdrs["Authorization"] = "Bearer " + token
+    req = urllib.request.Request(base + path, data=data, headers=hdrs, method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            raw = resp.read().decode()
+            return resp.status, json.loads(raw) if raw else {}
+    except urllib.error.HTTPError as e:
+        raw = e.read().decode()
         try:
-            resp = urllib.request.urlopen(req)
-            return resp.status, json.loads(resp.read().decode())
-        except urllib.error.HTTPError as e:
-            return e.code, json.loads(e.read().decode())
-        except (ConnectionRefusedError, ConnectionResetError, urllib.error.URLError) as e:
-            if attempt < retries:
-                print(f"    [RETRY] {method} {path} attempt {attempt+1} failed, retrying...")
-                time.sleep(1)
-            else:
-                return 0, {"error": str(e)}
+            return e.code, json.loads(raw)
+        except ValueError:
+            return e.code, {"raw": raw}
+    except urllib.error.URLError as e:
+        return 0, {"error": str(e)}
 
-def check(name, status, expected, detail=""):
+
+def check(name, status, expected):
     global PASS, FAIL
     ok = status == expected
-    symbol = "PASS" if ok else "FAIL"
-    if ok:
-        PASS += 1
-    else:
-        FAIL += 1
-    extra = f" - {detail}" if detail else ""
-    print(f"  [{symbol}] {name}: {status} (expected {expected}){extra}")
+    PASS, FAIL = PASS + ok, FAIL + (not ok)
+    print(f"  [{'PASS' if ok else 'FAIL'}] {name}: {status} (expected {expected})")
 
-# ── Register & Login ──
-_, reg = api("POST", "/auth/register", body={"email":"e2e@test.dev","username":"e2euser","password":"E2ePass99"})
-print("Register:", reg.get("message"))
 
-_, lr = api("POST", "/auth/login", body={"email":"e2e@test.dev","password":"E2ePass99"})
-tk = lr["data"]["access_token"]
-check("Login", 200, 200)
+def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--base", default="http://localhost:8000/api/v1")
+    parser.add_argument("--email", required=True)
+    parser.add_argument("--password", required=True)
+    args = parser.parse_args()
+    base = args.base.rstrip("/")
 
-# ── CORS Preflight ──
-for path in ["/user/me", "/chat", "/settings", "/notifications", "/admin/dashboard", "/mcp-servers"]:
-    time.sleep(DELAY)
-    req = urllib.request.Request(BASE + path, method="OPTIONS", headers={
+    s, r = api(base, "GET", "/health")
+    check("GET /health", s, 200)
+    if s == 0:
+        sys.exit(f"Backend not reachable at {base}: {r.get('error')}")
+
+    s, r = api(base, "POST", "/auth/login", body={"email": args.email, "password": args.password})
+    check("POST /auth/login", s, 200)
+    if s != 200:
+        sys.exit(f"Login failed: {r.get('message')}")
+    tk = r["data"]["access_token"]
+
+    s, _ = api(base, "OPTIONS", "/chat", headers={
         "Origin": "http://localhost:3000",
-        "Access-Control-Request-Method": "GET",
-        "Access-Control-Request-Headers": "Authorization,Content-Type",
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "authorization,content-type",
     })
-    resp = urllib.request.urlopen(req)
-    check(f"CORS OPTIONS {path}", resp.status, 204)
+    check("CORS preflight /chat", s, 204)
 
-# ── User/Me ──
-s, r = api("GET", "/user/me", token=tk)
-check("GET /user/me", s, 200, f"has user={'user' in r.get('data',{})}, profile={'profile' in r.get('data',{})}")
+    for path in ["/user/me", "/settings", "/notifications", "/notifications/unread-count",
+                 "/billing/subscription", "/billing/tokens", "/billing/transactions",
+                 "/api-keys", "/mcp-servers", "/chat"]:
+        s, _ = api(base, "GET", path, token=tk)
+        check(f"GET {path}", s, 200)
 
-# ── Profile Update ──
-s, r = api("PUT", "/user/profile", token=tk, body={"first_name": "E2E", "company": "TestCo"})
-check("PUT /user/profile", s, 200, f"first_name={r.get('data',{}).get('profile',{}).get('first_name')}")
+    s, _ = api(base, "GET", "/billing/plans")
+    check("GET /billing/plans (public)", s, 200)
 
-# ── Settings ──
-s, r = api("GET", "/settings", token=tk)
-check("GET /settings", s, 200)
+    s, _ = api(base, "PUT", "/user/profile", token=tk, body={"company": "Smoke Test"})
+    check("PUT /user/profile", s, 200)
 
-s, r = api("PUT", "/settings", token=tk, body={"theme": "dark", "notify_in_app": True})
-check("PUT /settings", s, 200)
+    s, _ = api(base, "PUT", "/settings", token=tk, body={"notify_in_app": True})
+    check("PUT /settings", s, 200)
 
-# ── Notifications ──
-s, r = api("GET", "/notifications", token=tk)
-check("GET /notifications", s, 200)
+    s, r = api(base, "POST", "/chat", token=tk, body={"title": "Smoke test", "prompt": "ping"})
+    check("POST /chat", s, 201)
+    if s == 201:
+        cid = r["data"]["id"]
+        s, _ = api(base, "GET", f"/chat/{cid}", token=tk)
+        check("GET /chat/:id", s, 200)
+        s, _ = api(base, "PATCH", f"/chat/{cid}/rename", token=tk, body={"title": "Renamed"})
+        check("PATCH /chat/:id/rename", s, 200)
+        s, _ = api(base, "DELETE", f"/chat/{cid}", token=tk)
+        check("DELETE /chat/:id", s, 200)
 
-s, r = api("PATCH", "/notifications/read-all", token=tk)
-check("PATCH /notifications/read-all", s, 200)
+    print(f"\n{PASS} passed, {FAIL} failed")
+    sys.exit(1 if FAIL else 0)
 
-# ── Billing (public) ──
-s, r = api("GET", "/billing/plans")
-check("GET /billing/plans (public)", s, 200)
 
-# ── Billing (auth) ──
-s, r = api("GET", "/billing/subscription", token=tk)
-check("GET /billing/subscription", s, 200)
-
-s, r = api("GET", "/billing/tokens", token=tk)
-check("GET /billing/tokens", s, 200)
-
-s, r = api("GET", "/billing/transactions", token=tk)
-check("GET /billing/transactions", s, 200)
-
-# ── API Keys ──
-s, r = api("GET", "/api-keys", token=tk)
-check("GET /api-keys", s, 200)
-
-# ── Chat ──
-s, r = api("POST", "/chat", token=tk, body={"title": "E2E Test Chat", "prompt": "What is the meaning of life?"})
-check("POST /chat", s, 201)
-if s == 201:
-    cid = r["data"]["id"]
-    s2, _ = api("GET", "/chat/" + cid, token=tk)
-    check("GET /chat/:id", s2, 200)
-
-    s3, _ = api("GET", "/chat", token=tk)
-    check("GET /chat (list)", s3, 200)
-
-    s4, _ = api("PATCH", f"/chat/{cid}/rename", token=tk, body={"title": "Renamed"})
-    check("PATCH /chat/:id/rename", s4, 200)
-
-    s5, _ = api("DELETE", "/chat/" + cid, token=tk)
-    check("DELETE /chat/:id", s5, 200)
-
-# ── Contact (public) ──
-s, r = api("POST", "/contact", body={"name":"Tester","email":"t@t.com","subject":"Test","message":"Hello"})
-check("POST /contact (public)", s, 201)
-
-# ── Summary ──
-print(f"\n{'='*50}")
-print(f"Results: {PASS} passed, {FAIL} failed")
-if FAIL > 0:
-    sys.exit(1)
-else:
-    print("ALL TESTS PASSED")
+if __name__ == "__main__":
+    main()

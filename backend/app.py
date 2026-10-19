@@ -35,6 +35,34 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger("accura")
+# Library chatter that drowns out our own logs in debug mode
+for _name in ("aiosqlite", "asyncio", "httpcore", "httpx", "openai", "hpack"):
+    logging.getLogger(_name).setLevel(logging.INFO if _name == "httpx" else logging.WARNING)
+
+
+def _dedupe_sanic_logs() -> None:
+    # Sanic attaches its own handlers (and re-applies its logging config
+    # when the app is created); without this every Sanic line is printed
+    # twice, once by Sanic and once by the root handler above.
+    for name in ("sanic.root", "sanic.error", "sanic.access", "sanic.server", "sanic.websockets"):
+        logging.getLogger(name).propagate = False
+
+_INSECURE_SECRETS = {"", "changeme", "change-me-in-production", "change-me-to-a-secure-random-string"}
+
+
+def _check_secrets() -> None:
+    """Refuse to boot in production with placeholder secrets."""
+    problems = []
+    if str(settings.get("jwt.secret", "")) in _INSECURE_SECRETS:
+        problems.append("JWT_SECRET is unset or a placeholder")
+    if not settings.get("security.encryption_key"):
+        problems.append("ENCRYPTION_KEY is unset (saving API keys will fail)")
+    if not problems:
+        return
+    if str(settings.get("app.environment", "")).lower() == "production" and not settings.get("app.debug"):
+        raise RuntimeError("Insecure configuration: " + "; ".join(problems))
+    for problem in problems:
+        logger.warning("Insecure configuration: %s", problem)
 
 # ---------------------------------------------------------------------------
 # App factory
@@ -97,6 +125,7 @@ def create_app() -> Sanic:
     @app.before_server_start
     async def startup(app_instance):
         logger.info("Accura backend starting – %s", settings.get("app.environment"))
+        _check_secrets()
         engine = Conversation._meta.db
         if not isinstance(engine, SQLiteEngine):
             await engine.start_connection_pool()
@@ -120,6 +149,7 @@ def create_app() -> Sanic:
         if not isinstance(engine, SQLiteEngine):
             await engine.close_connection_pool()
 
+    _dedupe_sanic_logs()
     return app
 
 

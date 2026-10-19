@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { adminApi } from "@/lib/api-client";
 import { formatDate } from "@/lib/utils";
 import { TIERS } from "@/lib/constants";
-import type { User } from "@/types";
+import type { AdminUserUpdateRequest, User } from "@/types";
 import {
   Card,
   CardContent,
@@ -63,14 +63,14 @@ export default function AdminUsersPage() {
       updates,
     }: {
       id: string;
-      updates: Record<string, unknown>;
-    }) => adminApi.updateUser(id, updates as any),
+      updates: AdminUserUpdateRequest;
+    }) => adminApi.updateUser(id, updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
       toast.success("User updated");
       setSelectedUser(null);
     },
-    onError: () => toast.error("Failed to update user"),
+    onError: (e: Error) => toast.error(e.message || "Failed to update user"),
   });
 
   const users = data?.data?.items || [];
@@ -210,11 +210,11 @@ export default function AdminUsersPage() {
               <div className="space-y-2">
                 <label className="text-sm font-medium">Subscription Tier</label>
                 <Select
-                  defaultValue={selectedUser.tier || "free"}
+                  defaultValue={selectedUser.tier || "basic"}
                   onValueChange={(tier) =>
                     updateUser.mutate({
                       id: selectedUser.id,
-                      updates: { tier },
+                      updates: { tier: tier as User["tier"] },
                     })
                   }
                 >
@@ -245,17 +245,17 @@ export default function AdminUsersPage() {
                   {selectedUser.is_admin ? "Remove Admin" : "Make Admin"}
                 </Button>
                 <Button
-                  variant="destructive"
+                  variant={selectedUser.is_active ? "destructive" : "default"}
                   size="sm"
                   onClick={() =>
                     updateUser.mutate({
                       id: selectedUser.id,
-                      updates: { is_active: false },
+                      updates: { is_active: !selectedUser.is_active },
                     })
                   }
                 >
                   <Ban className="mr-1 h-4 w-4" />
-                  Suspend
+                  {selectedUser.is_active ? "Suspend" : "Reactivate"}
                 </Button>
               </div>
             </div>

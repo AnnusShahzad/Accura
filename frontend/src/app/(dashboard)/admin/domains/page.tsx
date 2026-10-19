@@ -78,7 +78,7 @@ export default function AdminDomainsPage() {
       setIsDialogOpen(false);
       setEditing(null);
     },
-    onError: () => toast.error("Failed to save rule"),
+    onError: (e: Error) => toast.error(e.message || "Failed to save rule"),
   });
 
   const deleteMutation = useMutation({

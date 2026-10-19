@@ -80,7 +80,7 @@ export default function AdminPromptsPage() {
       setIsDialogOpen(false);
       setEditing(null);
     },
-    onError: () => toast.error("Failed to save prompt"),
+    onError: (e: Error) => toast.error(e.message || "Failed to save prompt"),
   });
 
   const deleteMutation = useMutation({

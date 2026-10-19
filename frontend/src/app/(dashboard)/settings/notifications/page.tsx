@@ -47,7 +47,7 @@ export default function NotificationsSettingsPage() {
       queryClient.invalidateQueries({ queryKey: ["settings"] });
       toast.success("Notification settings saved");
     },
-    onError: () => toast.error("Failed to save settings"),
+    onError: (e: Error) => toast.error(e.message || "Failed to save settings"),
   });
 
   const form = useForm({

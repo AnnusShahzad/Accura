@@ -34,6 +34,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CreditCard, Pencil, Loader2, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -58,7 +59,7 @@ export default function AdminPlansPage() {
       toast.success("Plan updated");
       setEditingPlan(null);
     },
-    onError: () => toast.error("Failed to update plan"),
+    onError: (e: Error) => toast.error(e.message || "Failed to update plan"),
   });
 
   const form = useForm<PlanUpdateFormData>({
@@ -72,7 +73,7 @@ export default function AdminPlansPage() {
           requests_per_day: editingPlan.requests_per_day,
           max_tokens_per_request: editingPlan.max_tokens_per_request,
           features: editingPlan.features,
-          is_active: true,
+          is_active: editingPlan.is_active ?? true,
         }
       : undefined,
   });
@@ -278,6 +279,29 @@ export default function AdminPlansPage() {
                   )}
                 />
               </div>
+              <FormField
+                control={form.control}
+                name="features"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Features (one per line)</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        rows={5}
+                        value={(field.value ?? []).join("\n")}
+                        onChange={(e) =>
+                          field.onChange(
+                            e.target.value.split("\n").map((f) => f.trimStart())
+                          )
+                        }
+                        onBlur={() =>
+                          field.onChange((field.value ?? []).map((f) => f.trim()).filter(Boolean))
+                        }
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
               <FormField
                 control={form.control}
                 name="is_active"

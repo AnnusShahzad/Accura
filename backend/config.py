@@ -16,10 +16,12 @@ _BASE_DIR = Path(__file__).resolve().parent
 _CONFIG_PATH = os.getenv("ACCURA_CONFIG_PATH", str(_BASE_DIR / "config.yaml"))
 _ENV_PATH = _BASE_DIR / ".env"
 
+# Real environment variables win over .env so that docker-compose
+# `environment:` entries and test fixtures can override the file.
 if _ENV_PATH.exists():
-    load_dotenv(dotenv_path=_ENV_PATH, override=True)
+    load_dotenv(dotenv_path=_ENV_PATH, override=False)
 else:
-    load_dotenv(override=True)
+    load_dotenv(override=False)
 
 
 def _deep_merge(base: dict, override: dict) -> dict:

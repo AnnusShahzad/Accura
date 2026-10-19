@@ -42,26 +42,19 @@ logger = logging.getLogger("accura")
 
 
 def create_app() -> Sanic:
-    app = Sanic("Accura")
+    # strict_slashes=False: "/api/v1/chat" and "/api/v1/chat/" are the same route
+    app = Sanic("Accura", strict_slashes=False)
 
-    # --- Configuration ---
+    # --- Configuration / CORS (handled by sanic-ext, incl. preflight) ---
+    origins = str(settings.get("app.cors_origins", "*") or "*")
     app.config.update({
-        "CORS_ORIGINS": "*",
+        "CORS_ORIGINS": origins if origins == "*" else [o.strip() for o in origins.split(",") if o.strip()],
         "CORS_METHODS": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        "CORS_HEADERS": ["Authorization", "Content-Type"],
+        "CORS_ALLOW_HEADERS": ["Authorization", "Content-Type", "Stripe-Signature"],
+        "CORS_MAX_AGE": 600,
         "FALLBACK_ERROR_FORMAT": "json",
+        "OAS_UI_DEFAULT": "swagger",
     })
-
-    # --- CORS ---
-    @app.options("/<path:path>")
-    async def cors_preflight(request: Request, path: str):
-        return sanic_json("", status=204)
-
-    @app.middleware("response")
-    async def add_cors_headers(request: Request, response):
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Methods"] = "GET,POST,PUT,PATCH,DELETE,OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "Authorization,Content-Type"
 
     # --- Middleware ---
     app.register_middleware(auth_middleware, "request")

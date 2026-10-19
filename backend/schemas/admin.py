@@ -6,13 +6,16 @@ from __future__ import annotations
 
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from urllib.parse import urlparse
+
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 class AdminConfigUpdateRequest(BaseModel):
-    key: str
-    value: dict | str | int | float | bool | list
-    description: str = ""
+    # Dotted path into the configuration, e.g. "evaluation.global_threshold"
+    key: str = Field(min_length=1, max_length=255, pattern=r"^[A-Za-z0-9_\-]+(\.[A-Za-z0-9_\-]+)*$")
+    value: dict | list | bool | int | float | str | None
+    description: str = Field(default="", max_length=2000)
 
 
 class AdminUserUpdateRequest(BaseModel):
@@ -31,6 +34,22 @@ class SystemPromptUpdateRequest(BaseModel):
 class DomainRuleRequest(BaseModel):
     domain: str = Field(min_length=1, max_length=500)
     rule_type: str = Field(pattern="^(whitelist|blacklist)$")
+
+    @field_validator("domain")
+    @classmethod
+    def normalize_domain(cls, v: str) -> str:
+        v = v.strip().lower()
+        if "://" in v:
+            v = urlparse(v).netloc
+        v = v.removeprefix("www.").split("/")[0]
+        if not v or "." not in v or " " in v:
+            raise ValueError("Enter a domain like example.com")
+        return v
+
+
+class ContactResolveRequest(BaseModel):
+    status: str = Field(default="resolved", pattern="^(resolved|open)$")
+    reply: str = Field(default="", max_length=20000)
 
 
 class PlanUpdateRequest(BaseModel):
@@ -55,8 +74,8 @@ class AdminDashboardResponse(BaseModel):
 
 class ContactRequest(BaseModel):
     name: str = Field(min_length=1, max_length=255)
-    email: str = Field(min_length=1, max_length=320)
+    email: EmailStr
     company: str = Field(default="", max_length=255)
     subject: str = Field(default="", max_length=500)
-    message: str = Field(min_length=1)
+    message: str = Field(min_length=1, max_length=10000)
     request_type: str = Field(default="general", pattern="^(general|business_upgrade|support)$")

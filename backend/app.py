@@ -102,6 +102,9 @@ def create_app() -> Sanic:
             await engine.start_connection_pool()
         await ensure_schema()
         await _seed_subscription_plans()
+        from routes.admin import apply_admin_config
+
+        await apply_admin_config()
 
     @app.after_server_start
     async def start_background_jobs(app_instance):

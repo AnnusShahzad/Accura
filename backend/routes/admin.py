@@ -8,6 +8,7 @@ GET    /api/v1/admin/users/<id>
 PUT    /api/v1/admin/users/<id>
 GET    /api/v1/admin/config
 PUT    /api/v1/admin/config
+DELETE /api/v1/admin/config/<key>
 GET    /api/v1/admin/system-prompts
 PUT    /api/v1/admin/system-prompts
 GET    /api/v1/admin/domain-rules
@@ -26,7 +27,9 @@ POST   /api/v1/admin/reload-config
 
 from __future__ import annotations
 
+import json
 import uuid
+from datetime import datetime, timezone
 
 from sanic import Blueprint, Request
 
@@ -40,10 +43,12 @@ from models.user import User
 from schemas.admin import (
     AdminConfigUpdateRequest,
     AdminUserUpdateRequest,
+    ContactResolveRequest,
     DomainRuleRequest,
     PlanUpdateRequest,
     SystemPromptUpdateRequest,
 )
+from schemas.mcp import CreateMCPServerRequest, UpdateMCPServerRequest
 from services.billing_service import get_revenue_summary
 from utils.crypto import encrypt
 from utils.responses import error, paginated, success, validation_error, int_arg
@@ -74,10 +79,19 @@ async def dashboard(request: Request):
         Transaction.created_at, ascending=False
     ).limit(20).run()
 
+    month_start = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    month_iters = await Iteration.select(Iteration.tokens_input, Iteration.tokens_output).where(
+        Iteration.created_at >= month_start
+    ).run()
+    tokens_month = sum((i["tokens_input"] or 0) + (i["tokens_output"] or 0) for i in month_iters)
+    conversations = await Conversation.count().run()
+
     return success({
         "total_users": total_users,
         "active_subscriptions": active_subs,
         "total_revenue": revenue["total_revenue"],
+        "tokens_generated_month": tokens_month,
+        "total_conversations": conversations,
         "tier_distribution": {"basic": basic, "pro": pro, "business": business},
         "recent_transactions": recent_txns,
     })
@@ -101,12 +115,13 @@ async def list_users(request: Request):
         User.id, User.email, User.username, User.tier,
         User.is_active, User.is_verified, User.is_admin, User.created_at,
     )
+    count = User.count()
     if search:
-        query = query.where(
-            (User.email.like(f"%{search}%")) | (User.username.like(f"%{search}%"))
-        )
+        matches = (User.email.ilike(f"%{search}%")) | (User.username.ilike(f"%{search}%"))
+        query = query.where(matches)
+        count = count.where(matches)
 
-    total = await User.count().run()
+    total = await count.run()
     users = await query.order_by(User.created_at, ascending=False).limit(per_page).offset(offset).run()
 
     return paginated(users, total, page, per_page)
@@ -120,6 +135,7 @@ async def get_user(request: Request, user_id: str):
     if not user:
         return error("User not found", status=404)
     user.pop("hashed_password", None)
+    user.pop("otp_code", None)
     return success(user)
 
 
@@ -136,8 +152,23 @@ async def update_user(request: Request, user_id: str):
     if not updates:
         return error("No fields to update", status=422)
 
+    target = await User.select(User.id).where(User.id == user_id).first().run()
+    if not target:
+        return error("User not found", status=404)
+
+    # Don't let an admin lock themselves out of the admin panel
+    if str(request.ctx.user["id"]) == user_id and (
+        updates.get("is_admin") is False or updates.get("is_active") is False
+    ):
+        return error("You cannot remove your own admin access or deactivate yourself", status=400)
+
+    updates["updated_at"] = datetime.now(timezone.utc)
     await User.update(updates).where(User.id == user_id).run()
-    return success(message="User updated")
+
+    user = await User.select().where(User.id == user_id).first().run()
+    user.pop("hashed_password", None)
+    user.pop("otp_code", None)
+    return success(user, message="User updated")
 
 
 # ---------------------------------------------------------------------------
@@ -161,25 +192,57 @@ async def upsert_config(request: Request):
     except Exception as exc:
         return validation_error(exc)
 
-    existing = await AdminConfig.select().where(AdminConfig.key == body.key).first().run()
+    # Piccolo stores str values for JSON columns verbatim (assuming they
+    # are already JSON), so always encode explicitly.
+    encoded = json.dumps(body.value)
+    now = datetime.now(timezone.utc)
+
+    existing = await AdminConfig.select(AdminConfig.id).where(AdminConfig.key == body.key).first().run()
     if existing:
         await AdminConfig.update({
-            AdminConfig.value: body.value,
+            AdminConfig.value: encoded,
             AdminConfig.description: body.description,
             AdminConfig.updated_by: request.ctx.user["email"],
+            AdminConfig.updated_at: now,
         }).where(AdminConfig.key == body.key).run()
     else:
         await AdminConfig.insert(
             AdminConfig(
                 id=str(uuid.uuid4()),
                 key=body.key,
-                value=body.value,
+                value=encoded,
                 description=body.description,
                 updated_by=request.ctx.user["email"],
             )
         ).run()
 
-    return success(message="Config updated")
+    await apply_admin_config()
+    saved = await AdminConfig.select().where(AdminConfig.key == body.key).first().run()
+    return success(saved, message="Config updated")
+
+
+@bp.delete("/config/<key:str>")
+@require_auth
+@require_admin
+async def delete_config(request: Request, key: str):
+    existing = await AdminConfig.select(AdminConfig.id).where(AdminConfig.key == key).first().run()
+    if not existing:
+        return error("Config key not found", status=404)
+    await AdminConfig.delete().where(AdminConfig.key == key).run()
+    await apply_admin_config()
+    return success(message="Config deleted")
+
+
+async def apply_admin_config() -> None:
+    """Load admin_config rows into the runtime settings override layer.
+
+    Keys are dotted config paths (e.g. ``evaluation.global_threshold``),
+    so anything in config.yaml can be overridden without a restart.
+    """
+    from config import settings
+
+    rows = await AdminConfig.select(AdminConfig.key, AdminConfig.value).run()
+    settings.apply_overrides({r["key"]: r["value"] for r in rows})
 
 
 # ---------------------------------------------------------------------------
@@ -236,6 +299,7 @@ async def upsert_system_prompt(request: Request):
         await SystemPrompt.update({
             SystemPrompt.prompt: body.prompt,
             SystemPrompt.version: body.version,
+            SystemPrompt.updated_at: datetime.now(timezone.utc),
         }).where(SystemPrompt.role == body.role).run()
     else:
         await SystemPrompt.insert(
@@ -263,10 +327,18 @@ async def update_system_prompt_by_id(request: Request, prompt_id: str):
     if not existing:
         return error("System prompt not found", status=404)
 
+    # role is unique: moving a prompt onto a role that already has one
+    # would violate the constraint and 500
+    if body.role != existing["role"]:
+        clash = await SystemPrompt.select(SystemPrompt.id).where(SystemPrompt.role == body.role).first().run()
+        if clash:
+            return error(f"A system prompt for role '{body.role}' already exists", status=409)
+
     await SystemPrompt.update({
         SystemPrompt.role: body.role,
         SystemPrompt.prompt: body.prompt,
         SystemPrompt.version: body.version,
+        SystemPrompt.updated_at: datetime.now(timezone.utc),
     }).where(SystemPrompt.id == prompt_id).run()
 
     updated = await SystemPrompt.select().where(SystemPrompt.id == prompt_id).first().run()
@@ -305,15 +377,23 @@ async def create_domain_rule(request: Request):
     except Exception as exc:
         return validation_error(exc)
 
+    duplicate = await DomainRule.select(DomainRule.id).where(
+        (DomainRule.domain == body.domain) & (DomainRule.rule_type == body.rule_type)
+    ).first().run()
+    if duplicate:
+        return error(f"{body.domain} is already on the {body.rule_type}", status=409)
+
+    rule_id = str(uuid.uuid4())
     await DomainRule.insert(
         DomainRule(
-            id=str(uuid.uuid4()),
+            id=rule_id,
             domain=body.domain,
             rule_type=body.rule_type,
         )
     ).run()
 
-    return success(message="Domain rule created", status=201)
+    created = await DomainRule.select().where(DomainRule.id == rule_id).first().run()
+    return success(created, message="Domain rule created", status=201)
 
 
 @bp.delete("/domain-rules/<rule_id:str>")
@@ -371,9 +451,21 @@ async def update_plan(request: Request, plan_id: str):
     if not updates:
         return error("No fields to update", status=422)
 
+    plan = await SubscriptionPlan.select(SubscriptionPlan.id).where(SubscriptionPlan.id == plan_id).first().run()
+    if not plan:
+        return error("Plan not found", status=404)
+
+    if "features" in updates:
+        updates["features"] = json.dumps(updates["features"])
+    updates["updated_at"] = datetime.now(timezone.utc)
     await SubscriptionPlan.update(updates).where(SubscriptionPlan.id == plan_id).run()
 
-    return success(message="Plan updated")
+    # Rate limits are read from plans; drop the cached values
+    from middleware.rate_limiter import _limit_cache
+    _limit_cache.clear()
+
+    updated = await SubscriptionPlan.select().where(SubscriptionPlan.id == plan_id).first().run()
+    return success(updated, message="Plan updated")
 
 
 # ---------------------------------------------------------------------------
@@ -384,36 +476,39 @@ async def update_plan(request: Request, plan_id: str):
 @require_auth
 @require_admin
 async def create_global_mcp(request: Request):
-    body = request.json
+    try:
+        body = CreateMCPServerRequest(**(request.json or {}))
+    except Exception as exc:
+        return validation_error(exc)
+
     server_id = str(uuid.uuid4())
-
-    encrypted_key = ""
-    if body.get("api_key"):
-        encrypted_key = encrypt(body["api_key"])
-
     await MCPServer.insert(
         MCPServer(
             id=server_id,
             user=None,
-            name=body["name"],
-            url=body["url"],
-            api_key_encrypted=encrypted_key,
-            description=body.get("description", ""),
+            name=body.name,
+            url=body.url,
+            api_key_encrypted=encrypt(body.api_key) if body.api_key else "",
+            description=body.description,
             is_global=True,
-            transport=body.get("transport", "sse"),
-            headers=body.get("headers", {}),
-            metadata=body.get("metadata", {}),
+            transport=body.transport,
+            headers=body.headers,
+            metadata=body.metadata,
         )
     ).run()
 
-    return success({"id": server_id}, message="Global MCP server created", status=201)
+    server = await MCPServer.select().where(MCPServer.id == server_id).first().run()
+    server.pop("api_key_encrypted", None)
+    return success(server, message="Global MCP server created", status=201)
 
 
 @bp.get("/mcp-servers")
 @require_auth
 @require_admin
 async def list_global_mcp(request: Request):
-    servers = await MCPServer.select().where(MCPServer.is_global == True).run()
+    servers = await MCPServer.select().where(MCPServer.is_global == True).order_by(  # noqa: E712
+        MCPServer.created_at, ascending=False
+    ).run()
     for s in servers:
         s.pop("api_key_encrypted", None)
     return success(servers)
@@ -423,18 +518,40 @@ async def list_global_mcp(request: Request):
 @require_auth
 @require_admin
 async def update_global_mcp(request: Request, server_id: str):
-    updates = request.json or {}
+    try:
+        body = UpdateMCPServerRequest(**(request.json or {}))
+    except Exception as exc:
+        return validation_error(exc)
+
+    server = await MCPServer.select(MCPServer.id).where(
+        (MCPServer.id == server_id) & (MCPServer.is_global == True)  # noqa: E712
+    ).first().run()
+    if not server:
+        return error("Global MCP server not found", status=404)
+
+    updates = body.model_dump(exclude_none=True)
     if "api_key" in updates:
-        updates["api_key_encrypted"] = encrypt(updates.pop("api_key"))
+        api_key = updates.pop("api_key")
+        updates["api_key_encrypted"] = encrypt(api_key) if api_key else ""
     if updates:
+        updates["updated_at"] = datetime.now(timezone.utc)
         await MCPServer.update(updates).where(MCPServer.id == server_id).run()
-    return success(message="MCP server updated")
+
+    updated = await MCPServer.select().where(MCPServer.id == server_id).first().run()
+    updated.pop("api_key_encrypted", None)
+    return success(updated, message="MCP server updated")
 
 
 @bp.delete("/mcp-servers/<server_id:str>")
 @require_auth
 @require_admin
 async def delete_global_mcp(request: Request, server_id: str):
+    # Only global servers: this must not become a way to delete users' servers
+    server = await MCPServer.select(MCPServer.id).where(
+        (MCPServer.id == server_id) & (MCPServer.is_global == True)  # noqa: E712
+    ).first().run()
+    if not server:
+        return error("Global MCP server not found", status=404)
     await MCPServer.delete().where(MCPServer.id == server_id).run()
     return success(message="MCP server deleted")
 
@@ -463,36 +580,40 @@ async def list_contact_requests(request: Request):
 @require_auth
 @require_admin
 async def resolve_contact_request(request: Request, request_id: str):
-    body = request.json or {}
-    status_value = body.get("status", "resolved")
-    reply = body.get("reply", "")
+    try:
+        body = ContactResolveRequest(**(request.json or {}))
+    except Exception as exc:
+        return validation_error(exc)
 
-    updates = {
-        ContactRequest.is_resolved: True,
-        ContactRequest.resolved_by: request.ctx.user["email"],
-    }
+    contact_req = await ContactRequest.select().where(ContactRequest.id == request_id).first().run()
+    if not contact_req:
+        return error("Contact request not found", status=404)
 
-    await ContactRequest.update(updates).where(
-        ContactRequest.id == request_id
-    ).run()
+    resolved = body.status == "resolved"
+    await ContactRequest.update({
+        ContactRequest.is_resolved: resolved,
+        ContactRequest.resolved_by: request.ctx.user["email"] if resolved else "",
+        ContactRequest.updated_at: datetime.now(timezone.utc),
+    }).where(ContactRequest.id == request_id).run()
 
-    # If a reply was provided, send it via email (best-effort)
-    if reply:
+    emailed = False
+    if body.reply:
+        from utils.email import send_email
+
         try:
-            contact_req = await ContactRequest.select().where(
-                ContactRequest.id == request_id
-            ).first().run()
-            if contact_req:
-                from utils.email import send_email
-                await send_email(
-                    to=contact_req["email"],
-                    subject=f"Re: {contact_req.get('subject', 'Your request')}",
-                    text_body=reply,
-                )
+            await send_email(
+                to=contact_req["email"],
+                subject=f"Re: {contact_req.get('subject') or 'Your request'}",
+                text_body=body.reply,
+            )
+            emailed = True
         except Exception:
-            pass  # Non-critical
+            return error("Status saved, but the reply email could not be sent. Check SMTP settings.", status=502)
 
-    return success(message="Contact request resolved")
+    message = "Contact request resolved" if resolved else "Contact request reopened"
+    if emailed:
+        message += " – reply sent"
+    return success({"is_resolved": resolved, "emailed": emailed}, message=message)
 
 
 # ---------------------------------------------------------------------------
@@ -506,4 +627,5 @@ async def reload_config(request: Request):
     """Hot-reload the YAML configuration."""
     from config import settings
     settings.reload()
+    await apply_admin_config()
     return success(message="Configuration reloaded")

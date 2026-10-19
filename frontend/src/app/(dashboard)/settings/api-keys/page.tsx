@@ -92,6 +92,7 @@ export default function ApiKeysPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["api-keys"] });
     },
+    onError: (e: Error) => toast.error(e.message || "Failed to update key"),
   });
 
   const deleteKey = useMutation({
@@ -100,6 +101,7 @@ export default function ApiKeysPage() {
       queryClient.invalidateQueries({ queryKey: ["api-keys"] });
       toast.success("API key deleted");
     },
+    onError: (e: Error) => toast.error(e.message || "Failed to delete key"),
   });
 
   const form = useForm<CreateApiKeyFormData>({
@@ -197,10 +199,16 @@ export default function ApiKeysPage() {
                   name="base_url"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Base URL (Optional)</FormLabel>
+                      <FormLabel>
+                        Base URL {form.watch("provider") === "custom" ? "(required)" : "(optional)"}
+                      </FormLabel>
                       <FormControl>
                         <Input
-                          placeholder="https://api.openai.com/v1"
+                          placeholder={
+                            form.watch("provider") === "custom"
+                              ? "https://your-endpoint.example.com/v1"
+                              : "Leave empty to use the provider's default"
+                          }
                           {...field}
                         />
                       </FormControl>

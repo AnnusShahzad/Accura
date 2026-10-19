@@ -9,8 +9,6 @@ import type { AdminUserUpdateRequest, User } from "@/types";
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import {

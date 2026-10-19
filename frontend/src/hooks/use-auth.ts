@@ -22,7 +22,7 @@ export function useAuth() {
       toast.success("Welcome back!");
       router.push("/chat");
     },
-    onError: (error: any, variables) => {
+    onError: (error: Error, variables) => {
       const message = error.message || "Failed to log in";
       toast.error(message);
 
@@ -37,7 +37,7 @@ export function useAuth() {
 
     mutationFn: (data: RegisterRequest) => authApi.register(data),
     onSuccess: (res, variables) => {
-      if ((res.data as any).already_exists_unverified) {
+      if (res.data.already_exists_unverified) {
         toast.error(
           "Account already exists but is not verified. A new verification code has been sent to your email."
         );
@@ -49,7 +49,7 @@ export function useAuth() {
       router.push(`/verify-otp?email=${encodeURIComponent(variables.email)}`);
     },
     onError: (error: Error) => {
-      toast.error(error.message || "Failed to reset password");
+      toast.error(error.message || "Failed to create account");
     },
   });
 

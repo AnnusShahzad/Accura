@@ -64,7 +64,6 @@ import {
   Send,
   Search,
   ChevronDown,
-  ChevronUp,
   RefreshCw,
   RotateCcw,
   User,

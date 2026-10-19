@@ -6,7 +6,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { settingsSchema, type SettingsFormData } from "@/lib/validations";
 import { settingsApi } from "@/lib/api-client";
 import { useSettings } from "@/hooks/use-settings";
-import { NOTIFICATION_CHANNELS } from "@/lib/constants";
 import {
   Card,
   CardContent,
@@ -14,19 +13,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Separator } from "@/components/ui/separator";
 import { Bell, Loader2, Webhook, Mail, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 
@@ -50,7 +40,8 @@ export default function NotificationsSettingsPage() {
     onError: (e: Error) => toast.error(e.message || "Failed to save settings"),
   });
 
-  const form = useForm({
+  const form = useForm<SettingsFormData>({
+    resolver: zodResolver(settingsSchema),
     defaultValues: {
       notify_in_app: settings?.notify_in_app ?? true,
       notify_email: settings?.notify_email ?? false,
@@ -74,8 +65,16 @@ export default function NotificationsSettingsPage() {
   const watchSlack = form.watch("notify_slack");
   const watchTeams = form.watch("notify_teams");
 
-  const onSubmit = (data: Record<string, unknown>) => {
-    updateSettings.mutate(data as Partial<SettingsFormData>);
+  const onSubmit = (data: SettingsFormData) => {
+    if (data.notify_slack && !data.slack_webhook_url) {
+      form.setError("slack_webhook_url", { message: "Required when Slack notifications are on" });
+      return;
+    }
+    if (data.notify_teams && !data.teams_webhook_url) {
+      form.setError("teams_webhook_url", { message: "Required when Teams notifications are on" });
+      return;
+    }
+    updateSettings.mutate(data);
   };
 
   if (isLoading) {
@@ -194,6 +193,11 @@ export default function NotificationsSettingsPage() {
                     placeholder="https://hooks.slack.com/services/..."
                     {...form.register("slack_webhook_url")}
                   />
+                  {form.formState.errors.slack_webhook_url && (
+                    <p className="text-xs text-destructive">
+                      {form.formState.errors.slack_webhook_url?.message}
+                    </p>
+                  )}
                 </div>
               )}
               {watchTeams && (
@@ -205,6 +209,11 @@ export default function NotificationsSettingsPage() {
                     placeholder="https://outlook.office.com/webhook/..."
                     {...form.register("teams_webhook_url")}
                   />
+                  {form.formState.errors.teams_webhook_url && (
+                    <p className="text-xs text-destructive">
+                      {form.formState.errors.teams_webhook_url?.message}
+                    </p>
+                  )}
                 </div>
               )}
             </CardContent>

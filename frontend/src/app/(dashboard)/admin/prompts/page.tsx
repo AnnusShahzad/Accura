@@ -51,7 +51,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FileText, Plus, Pencil, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";

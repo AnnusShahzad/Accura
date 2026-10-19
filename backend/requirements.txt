@@ -1,50 +1,37 @@
-# Sanic Web Framework
-sanic
-sanic-ext
+# Web framework
+sanic>=25.3,<26
+sanic-ext>=25.3,<26
 
-# Piccolo ORM
-piccolo[all]
-piccolo_admin
-piccolo_api
+# ORM / database drivers
+piccolo[postgres,sqlite]>=1.20,<2
+asyncpg>=0.29
+aiosqlite>=0.20
 
-# Authentication
-PyJWT
-bcrypt
-cryptography
+# Authentication & crypto
+PyJWT>=2.8,<3
+bcrypt>=4.1
+cryptography>=42
 
-# HTTP / AI Clients
-httpx
-openai
+# HTTP / AI clients (OpenAI SDK is used for every OpenAI-compatible provider)
+httpx>=0.27,<1
+openai>=1.60
 
 # Configuration
-pyyaml
-python-dotenv
+pyyaml>=6
+python-dotenv>=1
 
 # Email
-aiosmtplib
-jinja2
+aiosmtplib>=3
+jinja2>=3.1
 
 # Validation
-pydantic
+pydantic>=2.6,<3
+email-validator>=2
 
-# Rate Limiting
-sanic-limiter
-
-# Scheduling (recurring billing)
-apscheduler
-
-# Webhooks
-slack-sdk
-
-# Search
-googlesearch-python
+# Rate limiting across workers (optional at runtime, see redis.url)
+redis>=5
 
 # Testing
-pytest
-pytest-asyncio
-pytest-sanic
-
-# Utilities
-ujson
-aiofiles
-uuid6
+pytest>=8
+pytest-asyncio>=0.24
+sanic-testing>=24.6

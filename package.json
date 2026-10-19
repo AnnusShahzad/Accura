@@ -7,19 +7,21 @@
   ],
   "scripts": {
     "dev": "concurrently -k -n BACKEND,FRONTEND -c blue,green \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "dev:backend": "backend\\venv\\Scripts\\python.exe backend/app.py",
+    "dev:backend": "node scripts/run-backend.js",
     "dev:frontend": "npm run dev --workspace frontend",
     "build": "npm run build:frontend",
     "build:frontend": "npm run build --workspace frontend",
     "start": "concurrently -k -n BACKEND,FRONTEND -c blue,green \"npm run start:backend\" \"npm run start:frontend\"",
-    "start:backend": "backend\\venv\\Scripts\\python.exe backend/app.py",
+    "start:backend": "node scripts/run-backend.js",
     "start:frontend": "npm run start --workspace frontend",
     "lint": "npm run lint --workspace frontend",
     "setup": "npm run setup:frontend && npm run setup:backend",
     "setup:frontend": "npm install --workspace frontend",
-    "setup:backend": "python -m pip install -r backend/requirements.txt",
+    "setup:backend": "node scripts/setup-backend.js",
     "dev:infra": "docker compose -f backend/docker-compose.yml up -d postgres redis",
-    "stop:infra": "docker compose -f backend/docker-compose.yml down"
+    "stop:infra": "docker compose -f backend/docker-compose.yml down",
+    "test": "npm run test:backend",
+    "test:backend": "node scripts/run-backend-tests.js"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

@@ -2,7 +2,9 @@
 Accura – Notification Routes
 GET    /api/v1/notifications
 PATCH  /api/v1/notifications/<id>/read
+GET    /api/v1/notifications/unread-count
 PATCH  /api/v1/notifications/read-all
+DELETE /api/v1/notifications/<id>
 """
 
 from __future__ import annotations
@@ -12,7 +14,7 @@ from sanic import Blueprint, Request
 from middleware.auth_middleware import require_auth
 from models.notification import Notification
 from services.notification_service import get_notifications, mark_as_read
-from utils.responses import success, int_arg
+from utils.responses import error, success, int_arg
 
 bp = Blueprint("notifications", url_prefix="/api/v1/notifications")
 
@@ -34,6 +36,17 @@ async def list_notifications(request: Request):
     return success(notifications)
 
 
+@bp.get("/unread-count")
+@require_auth
+async def unread_count(request: Request):
+    count = await Notification.count().where(
+        (Notification.user == str(request.ctx.user["id"]))
+        & (Notification.channel == "in_app")
+        & (Notification.is_read == False)  # noqa: E712
+    ).run()
+    return success({"count": count})
+
+
 @bp.patch("/read-all")
 @require_auth
 async def read_all_notifications(request: Request):
@@ -51,3 +64,16 @@ async def read_notification(request: Request, notification_id: str):
     user_id = str(request.ctx.user["id"])
     await mark_as_read(notification_id, user_id)
     return success(message="Notification marked as read")
+
+
+@bp.delete("/<notification_id:str>")
+@require_auth
+async def delete_notification(request: Request, notification_id: str):
+    user_id = str(request.ctx.user["id"])
+    existing = await Notification.select(Notification.id).where(
+        (Notification.id == notification_id) & (Notification.user == user_id)
+    ).first().run()
+    if not existing:
+        return error("Notification not found", status=404)
+    await Notification.delete().where(Notification.id == notification_id).run()
+    return success(message="Notification deleted")

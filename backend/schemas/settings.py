@@ -14,16 +14,16 @@ class UpdateSettingsRequest(BaseModel):
     max_iterations: Optional[int] = Field(None, ge=1, le=50)
     timeout_seconds: Optional[int] = Field(None, ge=5, le=600)
     hide_evaluator_scoring: Optional[bool] = None
-    preferred_generator_model: Optional[str] = None
-    preferred_evaluator_model: Optional[str] = None
-    preferred_critic_model: Optional[str] = None
+    preferred_generator_model: Optional[str] = Field(None, min_length=1, max_length=100)
+    preferred_evaluator_model: Optional[str] = Field(None, min_length=1, max_length=100)
+    preferred_critic_model: Optional[str] = Field(None, min_length=1, max_length=100)
     notifications_enabled: Optional[bool] = None
     notify_in_app: Optional[bool] = None
     notify_email: Optional[bool] = None
     notify_slack: Optional[bool] = None
     notify_teams: Optional[bool] = None
-    slack_webhook_url: Optional[str] = Field(None, max_length=500)
-    teams_webhook_url: Optional[str] = Field(None, max_length=500)
+    slack_webhook_url: Optional[str] = Field(None, max_length=500, pattern=r"^(https://\S+)?$")
+    teams_webhook_url: Optional[str] = Field(None, max_length=500, pattern=r"^(https://\S+)?$")
     dark_mode: Optional[bool] = None
     search_enabled: Optional[bool] = None
 

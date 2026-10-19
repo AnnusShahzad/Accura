@@ -7,6 +7,7 @@ PUT  /api/v1/settings
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timezone
 
 from sanic import Blueprint, Request
 
@@ -60,6 +61,7 @@ async def update_settings(request: Request):
     ).first().run()
 
     if existing:
+        updates["updated_at"] = datetime.now(timezone.utc)
         await UserSettings.update(updates).where(
             UserSettings.user == user_id
         ).run()

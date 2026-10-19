@@ -6,20 +6,30 @@ from __future__ import annotations
 
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+
+
+_URL_PATTERN = r"^(https?://\S+)?$"
 
 
 class CreateAPIKeyRequest(BaseModel):
-    provider: str = Field(min_length=1, max_length=50)
+    provider: str = Field(pattern="^(openai|deepseek|anthropic|google|custom)$")
     label: str = Field(default="", max_length=255)
-    api_key: str = Field(min_length=1)
-    base_url: str = ""
+    api_key: str = Field(min_length=1, max_length=1000)
+    base_url: str = Field(default="", max_length=500, pattern=_URL_PATTERN)
+
+    @model_validator(mode="after")
+    def custom_needs_url(self):
+        if self.provider == "custom" and not self.base_url:
+            raise ValueError("A base URL is required for custom providers")
+        self.api_key = self.api_key.strip()
+        return self
 
 
 class UpdateAPIKeyRequest(BaseModel):
     label: Optional[str] = Field(None, max_length=255)
-    api_key: Optional[str] = None
-    base_url: Optional[str] = None
+    api_key: Optional[str] = Field(None, min_length=1, max_length=1000)
+    base_url: Optional[str] = Field(None, max_length=500, pattern=_URL_PATTERN)
     is_active: Optional[bool] = None
 
 

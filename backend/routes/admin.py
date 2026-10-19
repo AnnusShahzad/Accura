@@ -46,7 +46,7 @@ from schemas.admin import (
 )
 from services.billing_service import get_revenue_summary
 from utils.crypto import encrypt
-from utils.responses import error, paginated, success
+from utils.responses import error, paginated, success, validation_error, int_arg
 
 bp = Blueprint("admin", url_prefix="/api/v1/admin")
 
@@ -91,8 +91,8 @@ async def dashboard(request: Request):
 @require_auth
 @require_admin
 async def list_users(request: Request):
-    page = int(request.args.get("page", 1))
-    per_page = min(int(request.args.get("per_page", 50)), 200)
+    page = int_arg(request, "page", 1, minimum=1)
+    per_page = int_arg(request, "per_page", 50, minimum=1, maximum=200)
     offset = (page - 1) * per_page
 
     search = request.args.get("search", "")
@@ -128,9 +128,9 @@ async def get_user(request: Request, user_id: str):
 @require_admin
 async def update_user(request: Request, user_id: str):
     try:
-        body = AdminUserUpdateRequest(**request.json)
+        body = AdminUserUpdateRequest(**(request.json or {}))
     except Exception as exc:
-        return error(str(exc), status=422)
+        return validation_error(exc)
 
     updates = body.model_dump(exclude_none=True)
     if not updates:
@@ -157,9 +157,9 @@ async def list_config(request: Request):
 @require_admin
 async def upsert_config(request: Request):
     try:
-        body = AdminConfigUpdateRequest(**request.json)
+        body = AdminConfigUpdateRequest(**(request.json or {}))
     except Exception as exc:
-        return error(str(exc), status=422)
+        return validation_error(exc)
 
     existing = await AdminConfig.select().where(AdminConfig.key == body.key).first().run()
     if existing:
@@ -199,9 +199,9 @@ async def list_system_prompts(request: Request):
 @require_admin
 async def create_system_prompt(request: Request):
     try:
-        body = SystemPromptUpdateRequest(**request.json)
+        body = SystemPromptUpdateRequest(**(request.json or {}))
     except Exception as exc:
-        return error(str(exc), status=422)
+        return validation_error(exc)
 
     # Check if role already exists
     existing = await SystemPrompt.select().where(SystemPrompt.role == body.role).first().run()
@@ -227,9 +227,9 @@ async def create_system_prompt(request: Request):
 @require_admin
 async def upsert_system_prompt(request: Request):
     try:
-        body = SystemPromptUpdateRequest(**request.json)
+        body = SystemPromptUpdateRequest(**(request.json or {}))
     except Exception as exc:
-        return error(str(exc), status=422)
+        return validation_error(exc)
 
     existing = await SystemPrompt.select().where(SystemPrompt.role == body.role).first().run()
     if existing:
@@ -255,9 +255,9 @@ async def upsert_system_prompt(request: Request):
 @require_admin
 async def update_system_prompt_by_id(request: Request, prompt_id: str):
     try:
-        body = SystemPromptUpdateRequest(**request.json)
+        body = SystemPromptUpdateRequest(**(request.json or {}))
     except Exception as exc:
-        return error(str(exc), status=422)
+        return validation_error(exc)
 
     existing = await SystemPrompt.select().where(SystemPrompt.id == prompt_id).first().run()
     if not existing:
@@ -301,9 +301,9 @@ async def list_domain_rules(request: Request):
 @require_admin
 async def create_domain_rule(request: Request):
     try:
-        body = DomainRuleRequest(**request.json)
+        body = DomainRuleRequest(**(request.json or {}))
     except Exception as exc:
-        return error(str(exc), status=422)
+        return validation_error(exc)
 
     await DomainRule.insert(
         DomainRule(
@@ -329,9 +329,9 @@ async def delete_domain_rule(request: Request, rule_id: str):
 @require_admin
 async def update_domain_rule(request: Request, rule_id: str):
     try:
-        body = DomainRuleRequest(**request.json)
+        body = DomainRuleRequest(**(request.json or {}))
     except Exception as exc:
-        return error(str(exc), status=422)
+        return validation_error(exc)
 
     existing = await DomainRule.select().where(DomainRule.id == rule_id).first().run()
     if not existing:
@@ -363,9 +363,9 @@ async def list_plans(request: Request):
 @require_admin
 async def update_plan(request: Request, plan_id: str):
     try:
-        body = PlanUpdateRequest(**request.json)
+        body = PlanUpdateRequest(**(request.json or {}))
     except Exception as exc:
-        return error(str(exc), status=422)
+        return validation_error(exc)
 
     updates = body.model_dump(exclude_none=True)
     if not updates:
@@ -447,8 +447,8 @@ async def delete_global_mcp(request: Request, server_id: str):
 @require_auth
 @require_admin
 async def list_contact_requests(request: Request):
-    page = int(request.args.get("page", 1))
-    per_page = min(int(request.args.get("per_page", 50)), 200)
+    page = int_arg(request, "page", 1, minimum=1)
+    per_page = int_arg(request, "per_page", 50, minimum=1, maximum=200)
     offset = (page - 1) * per_page
 
     requests_list = await ContactRequest.select().order_by(

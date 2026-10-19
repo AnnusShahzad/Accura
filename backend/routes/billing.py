@@ -25,7 +25,7 @@ from services.billing_service import (
 )
 from services.token_tracker import get_user_token_usage
 from utils.exceptions import BillingError, NotFoundError
-from utils.responses import error, success
+from utils.responses import error, success, validation_error, int_arg
 
 bp = Blueprint("billing", url_prefix="/api/v1/billing")
 
@@ -41,9 +41,9 @@ async def list_plans(request: Request):
 @require_auth
 async def subscribe(request: Request):
     try:
-        body = CreateSubscriptionRequest(**request.json)
+        body = CreateSubscriptionRequest(**(request.json or {}))
     except Exception as exc:
-        return error(str(exc), status=422)
+        return validation_error(exc)
 
     user_id = str(request.ctx.user["id"])
 
@@ -103,8 +103,8 @@ async def get_subscription(request: Request):
 @require_auth
 async def transactions(request: Request):
     user_id = str(request.ctx.user["id"])
-    limit = min(int(request.args.get("limit", 50)), 100)
-    offset = int(request.args.get("offset", 0))
+    limit = int_arg(request, "limit", 50, minimum=1, maximum=100)
+    offset = int_arg(request, "offset", 0)
 
     txns = await get_transactions(user_id, limit=limit, offset=offset)
     return success(txns)

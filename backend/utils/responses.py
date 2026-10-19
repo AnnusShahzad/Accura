@@ -65,3 +65,41 @@ def paginated(items: list, total: int, page: int, per_page: int, **kwargs) -> HT
         },
         **kwargs,
     )
+
+
+def validation_error(exc: Exception, status: int = 422) -> HTTPResponse:
+    """Turn a pydantic ValidationError into a readable 422 response.
+
+    ``str(exc)`` on a pydantic error is a multi-line dump ending in a
+    documentation URL, which is useless as a toast in the frontend.
+    """
+    from pydantic import ValidationError as PydanticValidationError
+
+    if isinstance(exc, PydanticValidationError):
+        details = []
+        for err in exc.errors():
+            field = ".".join(str(p) for p in err.get("loc", ()) if p != "__root__")
+            msg = str(err.get("msg", "Invalid value"))
+            msg = msg.removeprefix("Value error, ")
+            details.append({"field": field, "message": msg})
+        message = "; ".join(
+            f"{d['field']}: {d['message']}" if d["field"] else d["message"] for d in details
+        )
+        return error(message or "Validation error", status=status, errors=details)
+    if isinstance(exc, TypeError):
+        # e.g. Model(**None) or unexpected payload shape
+        return error("Request body must be a JSON object", status=status)
+    return error(str(exc), status=status)
+
+
+def int_arg(request, name: str, default: int, *, minimum: int = 0, maximum: int | None = None) -> int:
+    """Read an integer query argument, falling back to *default* when the
+    value is missing or malformed instead of raising a 500."""
+    try:
+        value = int(request.args.get(name, default))
+    except (TypeError, ValueError):
+        value = default
+    value = max(minimum, value)
+    if maximum is not None:
+        value = min(maximum, value)
+    return value

@@ -12,7 +12,7 @@ from sanic import Blueprint, Request
 from middleware.auth_middleware import require_auth
 from models.notification import Notification
 from services.notification_service import get_notifications, mark_as_read
-from utils.responses import success
+from utils.responses import success, int_arg
 
 bp = Blueprint("notifications", url_prefix="/api/v1/notifications")
 
@@ -22,8 +22,8 @@ bp = Blueprint("notifications", url_prefix="/api/v1/notifications")
 async def list_notifications(request: Request):
     user_id = str(request.ctx.user["id"])
     unread_only = request.args.get("unread_only", "false").lower() == "true"
-    limit = min(int(request.args.get("limit", 50)), 100)
-    offset = int(request.args.get("offset", 0))
+    limit = int_arg(request, "limit", 50, minimum=1, maximum=100)
+    offset = int_arg(request, "offset", 0)
 
     notifications = await get_notifications(
         user_id=user_id,

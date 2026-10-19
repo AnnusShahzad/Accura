@@ -22,7 +22,7 @@ from models.settings import UserSettings
 from schemas.chat import AddAgentRequest, CreateConversationRequest, FollowUpMessageRequest, RenameConversationRequest
 from services.ai_orchestrator import orchestrate_conversation
 from services.token_tracker import get_conversation_token_usage
-from utils.responses import error, paginated, success
+from utils.responses import error, paginated, success, validation_error, int_arg
 
 bp = Blueprint("chat", url_prefix="/api/v1/chat")
 
@@ -31,9 +31,9 @@ bp = Blueprint("chat", url_prefix="/api/v1/chat")
 @require_auth
 async def create_conversation(request: Request):
     try:
-        body = CreateConversationRequest(**request.json)
+        body = CreateConversationRequest(**(request.json or {}))
     except Exception as exc:
-        return error(str(exc), status=422)
+        return validation_error(exc)
 
     user_id = str(request.ctx.user["id"])
     conv_id = str(uuid.uuid4())
@@ -98,8 +98,8 @@ async def create_conversation(request: Request):
 @require_auth
 async def list_conversations(request: Request):
     user_id = str(request.ctx.user["id"])
-    page = int(request.args.get("page", 1))
-    per_page = min(int(request.args.get("per_page", 20)), 100)
+    page = int_arg(request, "page", 1, minimum=1)
+    per_page = int_arg(request, "per_page", 20, minimum=1, maximum=100)
     offset = (page - 1) * per_page
 
     conversations = await Conversation.select().where(
@@ -151,9 +151,9 @@ async def get_conversation(request: Request, conversation_id: str):
 @require_auth
 async def rename_conversation(request: Request, conversation_id: str):
     try:
-        body = RenameConversationRequest(**request.json)
+        body = RenameConversationRequest(**(request.json or {}))
     except Exception as exc:
-        return error(str(exc), status=422)
+        return validation_error(exc)
 
     user_id = str(request.ctx.user["id"])
 
@@ -171,9 +171,9 @@ async def rename_conversation(request: Request, conversation_id: str):
 async def add_agent(request: Request, conversation_id: str):
     """Add a new AI agent mid-conversation to generate another response."""
     try:
-        body = AddAgentRequest(**request.json)
+        body = AddAgentRequest(**(request.json or {}))
     except Exception as exc:
-        return error(str(exc), status=422)
+        return validation_error(exc)
 
     user_id = str(request.ctx.user["id"])
 
@@ -276,9 +276,9 @@ async def list_messages(request: Request, conversation_id: str):
 async def send_followup_message(request: Request, conversation_id: str):
     """Append a follow-up user message to an existing conversation and re-run orchestration."""
     try:
-        body = FollowUpMessageRequest(**request.json)
+        body = FollowUpMessageRequest(**(request.json or {}))
     except Exception as exc:
-        return error(str(exc), status=422)
+        return validation_error(exc)
 
     user_id = str(request.ctx.user["id"])
 

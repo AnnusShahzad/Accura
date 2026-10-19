@@ -14,7 +14,7 @@ from sanic import Blueprint, Request
 from middleware.auth_middleware import require_auth
 from models.user import User, UserProfile
 from schemas.user import ProfileUpdateRequest
-from utils.responses import error, success
+from utils.responses import error, success, validation_error
 
 bp = Blueprint("user", url_prefix="/api/v1/user")
 
@@ -46,9 +46,9 @@ async def get_me(request: Request):
 @require_auth
 async def update_profile(request: Request):
     try:
-        body = ProfileUpdateRequest(**request.json)
+        body = ProfileUpdateRequest(**(request.json or {}))
     except Exception as exc:
-        return error(str(exc), status=422)
+        return validation_error(exc)
 
     user_id = str(request.ctx.user["id"])
 

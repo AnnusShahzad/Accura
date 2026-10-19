@@ -19,7 +19,7 @@ from models.mcp_server import MCPServer
 from schemas.mcp import CreateMCPServerRequest, UpdateMCPServerRequest
 from services.mcp_service import list_mcp_tools
 from utils.crypto import encrypt
-from utils.responses import error, success
+from utils.responses import error, success, validation_error
 
 bp = Blueprint("mcp", url_prefix="/api/v1/mcp-servers")
 
@@ -29,9 +29,9 @@ bp = Blueprint("mcp", url_prefix="/api/v1/mcp-servers")
 @require_tier("pro", "business")
 async def create_mcp_server(request: Request):
     try:
-        body = CreateMCPServerRequest(**request.json)
+        body = CreateMCPServerRequest(**(request.json or {}))
     except Exception as exc:
-        return error(str(exc), status=422)
+        return validation_error(exc)
 
     user_id = str(request.ctx.user["id"])
     server_id = str(uuid.uuid4())
@@ -97,9 +97,9 @@ async def get_mcp_server(request: Request, server_id: str):
 @require_auth
 async def update_mcp_server(request: Request, server_id: str):
     try:
-        body = UpdateMCPServerRequest(**request.json)
+        body = UpdateMCPServerRequest(**(request.json or {}))
     except Exception as exc:
-        return error(str(exc), status=422)
+        return validation_error(exc)
 
     user_id = str(request.ctx.user["id"])
 

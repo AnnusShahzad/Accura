@@ -16,7 +16,7 @@ from middleware.auth_middleware import require_auth
 from models.api_key import UserAPIKey
 from schemas.api_key import CreateAPIKeyRequest, UpdateAPIKeyRequest
 from utils.crypto import encrypt, decrypt
-from utils.responses import error, success
+from utils.responses import error, success, validation_error
 
 bp = Blueprint("api_keys", url_prefix="/api/v1/api-keys")
 
@@ -36,9 +36,9 @@ def _key_preview(encrypted: str) -> str:
 @require_auth
 async def create_api_key(request: Request):
     try:
-        body = CreateAPIKeyRequest(**request.json)
+        body = CreateAPIKeyRequest(**(request.json or {}))
     except Exception as exc:
-        return error(str(exc), status=422)
+        return validation_error(exc)
 
     user_id = str(request.ctx.user["id"])
     key_id = str(uuid.uuid4())
@@ -95,9 +95,9 @@ async def list_api_keys(request: Request):
 @require_auth
 async def update_api_key(request: Request, key_id: str):
     try:
-        body = UpdateAPIKeyRequest(**request.json)
+        body = UpdateAPIKeyRequest(**(request.json or {}))
     except Exception as exc:
-        return error(str(exc), status=422)
+        return validation_error(exc)
 
     user_id = str(request.ctx.user["id"])
 

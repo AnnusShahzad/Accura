@@ -1,3 +1,9 @@
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import { billingApi } from "@/lib/api-client";
+import { formatNumber } from "@/lib/utils";
+import type { SubscriptionPlan } from "@/types";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -11,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Check, X } from "lucide-react";
 import Link from "next/link";
 
-const plans = [
+const fallbackPlans = [
   {
     name: "Basic",
     price: "Free",
@@ -71,7 +77,38 @@ const plans = [
   },
 ];
 
+// Prices and limits come from the API so admin edits show up here; the
+// static copy above supplies marketing text and is the fallback if the
+// API is unreachable.
+function withLivePlan(plan: (typeof fallbackPlans)[number], live: SubscriptionPlan) {
+  const price = Number(live.price_monthly);
+  return {
+    ...plan,
+    name: live.display_name || plan.name,
+    price: price > 0 ? `$${price.toFixed(2)}` : "Free",
+    features: [
+      { text: `${formatNumber(live.requests_per_minute)} requests per minute`, included: true },
+      { text: `${formatNumber(live.requests_per_day)} requests per day`, included: true },
+      { text: `${formatNumber(live.max_tokens_per_request)} max tokens per request`, included: true },
+      ...plan.features.slice(3),
+    ],
+  };
+}
+
 export function Pricing() {
+  const { data: livePlans } = useQuery({
+    queryKey: ["plans"],
+    queryFn: async () => (await billingApi.getPlans()).data,
+    retry: false,
+  });
+
+  const plans = livePlans
+    ? fallbackPlans.flatMap((plan) => {
+        const live = livePlans.find((p) => p.name === plan.name.toLowerCase());
+        return live ? [withLivePlan(plan, live)] : [];
+      })
+    : fallbackPlans;
+
   return (
     <section className="py-24 sm:py-32" id="pricing">
       <div className="mx-auto max-w-7xl px-6 lg:px-8">

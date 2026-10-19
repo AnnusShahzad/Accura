@@ -6,6 +6,7 @@ import {
   useRenameConversation,
   useAddAgent,
   useConversationMessages,
+  useRetryConversation,
   useSendFollowUpMessage,
 } from "@/hooks/use-chat";
 import { useSettings } from "@/hooks/use-settings";
@@ -65,9 +66,51 @@ import {
   ChevronDown,
   ChevronUp,
   RefreshCw,
+  RotateCcw,
   User,
+  XCircle,
 } from "lucide-react";
 import type { ChatMessage } from "@/types";
+import Link from "next/link";
+
+// ─── Error Bubble ─────────────────────────────────────────────────────────────
+function ErrorBubble({
+  message,
+  onRetry,
+  retrying,
+  showRetry,
+}: {
+  message: ChatMessage;
+  onRetry: () => void;
+  retrying: boolean;
+  showRetry: boolean;
+}) {
+  const keyProblem = /api key|401/i.test(message.content);
+  return (
+    <div className="flex items-end gap-3 justify-start">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-destructive/30 bg-destructive/10">
+        <XCircle className="h-4 w-4 text-destructive" />
+      </div>
+      <div className="max-w-[72%] space-y-2 rounded-2xl rounded-bl-sm border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm">
+        <p className="font-medium text-destructive">The response could not be generated</p>
+        <p className="text-muted-foreground whitespace-pre-wrap">{message.content}</p>
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          {showRetry && (
+            <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" onClick={onRetry} disabled={retrying}>
+              {retrying ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}
+              Retry
+            </Button>
+          )}
+          {keyProblem && (
+            <Button size="sm" variant="ghost" className="h-7 text-xs" asChild>
+              <Link href="/settings/api-keys">Manage API keys</Link>
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ─── Thinking Bubble ──────────────────────────────────────────────────────────
 function ThinkingBubble({
@@ -160,6 +203,17 @@ function MessageBubble({
                 Score: {Number(message.score).toFixed(1)}%
               </Badge>
             )}
+            {message.metadata?.model && (
+              <Badge variant="outline" className="text-xs h-5 px-1.5 py-0">
+                <Bot className="h-3 w-3 mr-1" />
+                {message.metadata.model}
+              </Badge>
+            )}
+            {message.metadata?.alternative && (
+              <Badge variant="secondary" className="text-xs h-5 px-1.5 py-0">
+                Alternative
+              </Badge>
+            )}
             {searchEnabled && (
               <Badge variant="outline" className="text-xs h-5 px-1.5 py-0">
                 <Search className="h-3 w-3 mr-1" />
@@ -212,7 +266,11 @@ export default function ChatDetailPage({
 }) {
   const { id } = use(params);
   const { data: conversation, isLoading } = useConversation(id);
-  const { data: messages, isLoading: messagesLoading } = useConversationMessages(id);
+  const { data: messages, isLoading: messagesLoading } = useConversationMessages(
+    id,
+    conversation?.status === "active"
+  );
+  const retry = useRetryConversation();
   const { data: settings } = useSettings();
   const renameConversation = useRenameConversation();
   const addAgent = useAddAgent();
@@ -226,16 +284,17 @@ export default function ChatDetailPage({
   const [searchEnabled, setSearchEnabled] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
 
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
   const hideScoring = settings?.hide_evaluator_scoring ?? false;
   const isActive = conversation?.status === "active";
+  const isFailed = conversation?.status === "failed";
 
-  // Auto-scroll to bottom whenever messages change or status becomes active
+  // Auto-scroll to the newest message. (A ref on ScrollArea points at its
+  // root, not the scrolling viewport, so scrollTop there did nothing.)
   useEffect(() => {
-    const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, isActive]);
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages?.length, isActive]);
 
   if (isLoading) {
     return (
@@ -249,8 +308,11 @@ export default function ChatDetailPage({
 
   if (!conversation) {
     return (
-      <div className="flex flex-col items-center py-16">
+      <div className="flex flex-col items-center gap-4 py-16">
         <p className="text-muted-foreground">Conversation not found</p>
+        <Button asChild variant="outline">
+          <Link href="/chat">Back to conversations</Link>
+        </Button>
       </div>
     );
   }
@@ -281,12 +343,14 @@ export default function ChatDetailPage({
   // Build the displayed messages: if the API returned messages use those,
   // otherwise fall back to constructing them from conversation fields
   const displayMessages: ChatMessage[] = messages && messages.length > 0
-    ? messages.filter((m) => m.role === "user" || m.role === "assistant")
+    ? messages.filter(
+        (m) => m.role === "user" || m.role === "assistant" || m.metadata?.type === "error"
+      )
     : [
         ...(conversation.prompt
           ? [{
               id: "fallback-user",
-              conversation_id: id,
+              conversation: id,
               role: "user" as const,
               content: conversation.prompt,
               created_at: conversation.created_at,
@@ -295,7 +359,7 @@ export default function ChatDetailPage({
         ...(conversation.best_response
           ? [{
               id: "fallback-assistant",
-              conversation_id: id,
+              conversation: id,
               role: "assistant" as const,
               content: conversation.best_response,
               score: conversation.best_score,
@@ -305,6 +369,11 @@ export default function ChatDetailPage({
       ];
 
   const meta = conversation.metadata;
+  const lastMessageId = displayMessages[displayMessages.length - 1]?.id;
+  const agentModels = new Map(
+    (conversation.agents ?? []).map((a) => [a.id, a.model] as const)
+  );
+  const threshold = meta?.threshold ?? conversation.threshold ?? settings?.global_threshold ?? 75;
 
   return (
     <div className="flex h-[calc(100vh-100px)] flex-col gap-0">
@@ -347,7 +416,13 @@ export default function ChatDetailPage({
           {conversation.status === "completed" && (
             <Badge variant="default" className="gap-1">
               <CheckCircle2 className="h-3 w-3" />
-              {!hideScoring ? `${conversation.best_score}%` : "Done"}
+              {!hideScoring ? `${Number(conversation.best_score).toFixed(1)}%` : "Done"}
+            </Badge>
+          )}
+          {isFailed && (
+            <Badge variant="destructive" className="gap-1">
+              <XCircle className="h-3 w-3" />
+              Failed
             </Badge>
           )}
           {conversation.search_enabled && (
@@ -363,7 +438,7 @@ export default function ChatDetailPage({
           {/* Add Agent */}
           <Dialog>
             <DialogTrigger asChild>
-              <Button size="sm" variant="outline" className="h-7 text-xs gap-1">
+              <Button size="sm" variant="outline" className="h-7 text-xs gap-1" disabled={isActive}>
                 <Plus className="h-3 w-3" />
                 Agent
               </Button>
@@ -413,14 +488,14 @@ export default function ChatDetailPage({
         <div className="py-2 px-1 shrink-0">
           <div className="flex justify-between text-xs text-muted-foreground mb-1">
             <span>Quality progress</span>
-            <span>{meta.current_best_score}% / {conversation.threshold ?? 75}% threshold</span>
+            <span>{meta.current_best_score}% / {threshold}% threshold</span>
           </div>
           <Progress value={meta.current_best_score} className="h-1.5" />
         </div>
       )}
 
       {/* ── Chat Messages ───────────────────────────────────────────────────── */}
-      <ScrollArea className="flex-1 min-h-0" ref={scrollRef as any}>
+      <ScrollArea className="flex-1 min-h-0">
         <div className="flex flex-col gap-5 py-4 px-1">
           {messagesLoading && displayMessages.length === 0 ? (
             <div className="space-y-4">
@@ -428,14 +503,24 @@ export default function ChatDetailPage({
               <Skeleton className="h-24 w-3/4 ml-auto" />
             </div>
           ) : (
-            displayMessages.map((msg) => (
-              <MessageBubble
-                key={msg.id}
-                message={msg}
-                hideScoring={hideScoring}
-                searchEnabled={conversation.search_enabled}
-              />
-            ))
+            displayMessages.map((msg) =>
+              msg.metadata?.type === "error" ? (
+                <ErrorBubble
+                  key={msg.id}
+                  message={msg}
+                  onRetry={() => retry.mutate(id)}
+                  retrying={retry.isPending}
+                  showRetry={isFailed && msg.id === lastMessageId}
+                />
+              ) : (
+                <MessageBubble
+                  key={msg.id}
+                  message={msg}
+                  hideScoring={hideScoring}
+                  searchEnabled={conversation.search_enabled}
+                />
+              )
+            )
           )}
 
           {/* Thinking bubble when processing */}
@@ -443,9 +528,10 @@ export default function ChatDetailPage({
             <ThinkingBubble
               currentIteration={meta?.current_iteration}
               maxIterations={meta?.max_iterations}
-              currentBestScore={meta?.current_best_score}
+              currentBestScore={hideScoring ? undefined : meta?.current_best_score}
             />
           )}
+          <div ref={bottomRef} />
         </div>
       </ScrollArea>
 
@@ -536,7 +622,14 @@ export default function ChatDetailPage({
                         <Card key={iter.id}>
                           <CardHeader className="pb-2 pt-3 px-4">
                             <div className="flex items-center justify-between">
-                              <CardTitle className="text-sm">Iteration #{iter.iteration_number}</CardTitle>
+                              <CardTitle className="text-sm">
+                                Turn {iter.turn ?? 1} · Iteration #{iter.iteration_number}
+                                {agentModels.get(iter.agent) && (
+                                  <span className="ml-2 text-xs font-normal text-muted-foreground">
+                                    {agentModels.get(iter.agent)}
+                                  </span>
+                                )}
+                              </CardTitle>
                               <div className="flex items-center gap-1.5">
                                 {iter.timed_out && (
                                   <Badge variant="destructive" className="text-xs h-5">
@@ -545,7 +638,7 @@ export default function ChatDetailPage({
                                   </Badge>
                                 )}
                                 {!hideScoring && (
-                                  <Badge variant={iter.score >= 75 ? "default" : "secondary"} className="text-xs h-5">
+                                  <Badge variant={iter.score >= threshold ? "default" : "secondary"} className="text-xs h-5">
                                     {iter.score}%
                                   </Badge>
                                 )}

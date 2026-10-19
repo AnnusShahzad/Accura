@@ -19,9 +19,11 @@ import {
 import { Plus, MessageSquare, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { formatDate } from "@/lib/utils";
+import { CONVERSATION_STATUSES } from "@/lib/constants";
 
 export default function ChatListPage() {
-  const { data, isLoading } = useConversations();
+  const [page, setPage] = useState(1);
+  const { data, isLoading } = useConversations(page);
   const { conversations } = useChatStore();
   const deleteConversation = useDeleteConversation();
   const [confirmId, setConfirmId] = useState<string | null>(null);
@@ -77,15 +79,22 @@ export default function ChatListPage() {
                 {/* Row 1: Badge + Delete */}
                 <div className="flex items-center justify-between">
                   <Badge
-                    variant={conv.status === "completed" ? "default" : "secondary"}
+                    variant={
+                      conv.status === "completed"
+                        ? "default"
+                        : conv.status === "failed"
+                          ? "destructive"
+                          : "secondary"
+                    }
                     className="text-xs px-2 py-0"
                   >
-                    {conv.status}
+                    {CONVERSATION_STATUSES[conv.status] ?? conv.status}
                   </Badge>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 -mr-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/10"
+                    aria-label="Delete conversation"
+                    className="h-6 w-6 -mr-1 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity hover:bg-destructive/10"
                     onClick={(e) => {
                       e.preventDefault();
                       setConfirmId(conv.id);
@@ -106,7 +115,7 @@ export default function ChatListPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">{formatDate(conv.created_at)}</span>
                   {conv.best_score > 0 && (
-                    <span className="text-xs font-medium text-primary">Score: {conv.best_score}%</span>
+                    <span className="text-xs font-medium text-primary">Score: {Number(conv.best_score).toFixed(1)}%</span>
                   )}
                 </div>
 
@@ -117,10 +126,21 @@ export default function ChatListPage() {
       )}
 
       {data && data.pages > 1 && (
-        <div className="flex justify-center">
+        <div className="flex items-center justify-center gap-3">
+          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+            Previous
+          </Button>
           <p className="text-sm text-muted-foreground">
-            Showing {data.items.length} of {data.total} conversations
+            Page {data.page} of {data.pages} · {data.total} conversations
           </p>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page >= data.pages}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Next
+          </Button>
         </div>
       )}
 
@@ -130,7 +150,8 @@ export default function ChatListPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this conversation?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. The conversation will be permanently deleted.
+              This action cannot be undone. The conversation, its messages and all
+              iterations will be permanently deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

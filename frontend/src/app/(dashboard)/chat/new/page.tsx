@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -9,8 +9,7 @@ import {
 } from "@/lib/validations";
 import { useCreateConversation } from "@/hooks/use-chat";
 import { useSettings } from "@/hooks/use-settings";
-import { useAuthStore } from "@/stores/auth-store";
-import { AI_MODELS } from "@/lib/constants";
+import { AI_MODELS, DEFAULTS, providerForModel } from "@/lib/constants";
 import {
   Card,
   CardContent,
@@ -50,7 +49,6 @@ import { useRouter } from "next/navigation";
 
 export default function NewChatPage() {
   const router = useRouter();
-  const { user } = useAuthStore();
   const { data: settings } = useSettings();
   const createConversation = useCreateConversation();
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -60,27 +58,54 @@ export default function NewChatPage() {
     defaultValues: {
       prompt: "",
       title: "",
-      generator_model: settings?.preferred_generator_model || "gpt-5.2",
-      generator_provider: "openai",
-      evaluator_model: settings?.preferred_evaluator_model || "gpt-5.1",
-      evaluator_provider: "openai",
-      search_enabled: settings?.search_enabled || false,
+      generator_model: DEFAULTS.preferredGeneratorModel,
+      generator_provider: providerForModel(DEFAULTS.preferredGeneratorModel),
+      evaluator_model: DEFAULTS.preferredEvaluatorModel,
+      evaluator_provider: providerForModel(DEFAULTS.preferredEvaluatorModel),
+      search_enabled: false,
       is_temporary: false,
-      threshold: settings?.global_threshold || 75,
-      max_iterations: settings?.max_iterations || 5,
-      timeout_seconds: settings?.timeout_seconds || 120,
+      threshold: DEFAULTS.globalThreshold,
+      max_iterations: DEFAULTS.maxIterations,
+      timeout_seconds: DEFAULTS.timeoutSeconds,
     },
   });
+
+  // defaultValues are captured on the first render, before the settings
+  // query resolves; apply the user's preferences once they arrive without
+  // clobbering anything already typed.
+  useEffect(() => {
+    if (!settings) return;
+    const gen = settings.preferred_generator_model || DEFAULTS.preferredGeneratorModel;
+    const evalModel = settings.preferred_evaluator_model || DEFAULTS.preferredEvaluatorModel;
+    form.reset(
+      {
+        ...form.getValues(),
+        generator_model: gen,
+        generator_provider: providerForModel(gen),
+        evaluator_model: evalModel,
+        evaluator_provider: providerForModel(evalModel),
+        search_enabled: settings.search_enabled,
+        threshold: Number(settings.global_threshold),
+        max_iterations: settings.max_iterations,
+        timeout_seconds: settings.timeout_seconds,
+      },
+      { keepDirtyValues: true }
+    );
+  }, [settings, form]);
 
   const onSubmit = async (data: CreateConversationFormData) => {
     const result = await createConversation.mutateAsync(data);
     router.push(`/chat/${result.data.id}`);
   };
 
-  const availableModels =
-    user?.tier === "basic"
-      ? AI_MODELS.filter((m) => m.value !== "deepseek-v3")
-      : AI_MODELS;
+  // Preferred models saved in settings may not be in the built-in list
+  const availableModels = [
+    ...AI_MODELS,
+    ...[settings?.preferred_generator_model, settings?.preferred_evaluator_model]
+      .filter((m): m is string => !!m && !AI_MODELS.some((x) => x.value === m))
+      .filter((m, i, arr) => arr.indexOf(m) === i)
+      .map((m) => ({ value: m, label: m, provider: providerForModel(m) })),
+  ];
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -157,16 +182,8 @@ export default function NewChatPage() {
                       <FormLabel>Generator Model</FormLabel>
                       <Select
                         onValueChange={(val) => {
-                          const model = AI_MODELS.find(
-                            (m) => m.value === val
-                          );
                           field.onChange(val);
-                          if (model) {
-                            form.setValue(
-                              "generator_provider",
-                              model.provider
-                            );
-                          }
+                          form.setValue("generator_provider", providerForModel(val));
                         }}
                         value={field.value}
                       >
@@ -195,16 +212,8 @@ export default function NewChatPage() {
                       <FormLabel>Evaluator Model</FormLabel>
                       <Select
                         onValueChange={(val) => {
-                          const model = AI_MODELS.find(
-                            (m) => m.value === val
-                          );
                           field.onChange(val);
-                          if (model) {
-                            form.setValue(
-                              "evaluator_provider",
-                              model.provider
-                            );
-                          }
+                          form.setValue("evaluator_provider", providerForModel(val));
                         }}
                         value={field.value}
                       >
@@ -262,7 +271,7 @@ export default function NewChatPage() {
                       <div>
                         <FormLabel>Temporary Chat</FormLabel>
                         <FormDescription className="text-xs">
-                          Don&apos;t save this conversation
+                          Keep it out of your conversation history
                         </FormDescription>
                       </div>
                     </FormItem>

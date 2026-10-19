@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { billingApi, userApi } from "@/lib/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import { TIERS } from "@/lib/constants";
 import { formatDate, formatNumber, cn } from "@/lib/utils";
-import type { Subscription, Transaction, TokenUsage, SubscriptionPlan } from "@/types";
+import type { Transaction, SubscriptionPlan } from "@/types";
 import { toast } from "sonner";
 import {
   Card,
@@ -38,7 +39,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import {
   CreditCard,
   TrendingUp,
@@ -49,8 +49,45 @@ import {
 } from "lucide-react";
 
 export default function BillingPage() {
+  // useSearchParams() needs a Suspense boundary for static rendering
+  return (
+    <Suspense fallback={<Skeleton className="mx-auto h-96 max-w-5xl" />}>
+      <BillingContent />
+    </Suspense>
+  );
+}
+
+function BillingContent() {
   const { user, setUser } = useAuthStore();
   const queryClient = useQueryClient();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [confirmCancel, setConfirmCancel] = useState(false);
+
+  const refreshUser = async () => {
+    try {
+      const meRes = await userApi.getMe();
+      setUser(meRes.data.user, meRes.data.profile);
+    } catch {
+      // the next page load will pick the new tier up
+    }
+  };
+
+  // Returning from Stripe Checkout
+  const checkout = searchParams.get("checkout");
+  useEffect(() => {
+    if (!checkout) return;
+    if (checkout === "success") {
+      toast.success("Payment received – your plan will update in a moment.");
+      queryClient.invalidateQueries({ queryKey: ["subscription"] });
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      refreshUser();
+    } else {
+      toast.info("Checkout cancelled – you have not been charged.");
+    }
+    router.replace("/settings/billing");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkout]);
 
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan | null>(null);
@@ -94,19 +131,16 @@ export default function BillingPage() {
   const subscribe = useMutation({
     mutationFn: (data: { plan_name: string; billing_cycle: "monthly" | "yearly" }) =>
       billingApi.subscribe(data),
-    onSuccess: async () => {
-      toast.success("Subscription upgraded successfully!");
+    onSuccess: async (res) => {
+      if ("checkout_url" in res.data) {
+        // Stripe mode: the plan activates when Stripe confirms payment
+        window.location.href = res.data.checkout_url;
+        return;
+      }
+      toast.success(res.message || "Plan updated");
       queryClient.invalidateQueries({ queryKey: ["subscription"] });
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      
-      try {
-        const meRes = await userApi.getMe();
-        if (meRes.success) {
-          setUser(meRes.data.user, meRes.data.profile);
-        }
-      } catch (e) {
-        console.error("Failed to refresh user profile", e);
-      }
+      await refreshUser();
 
       setIsPaymentModalOpen(false);
       setSelectedPlan(null);
@@ -115,14 +149,36 @@ export default function BillingPage() {
       setExpiry("");
       setCvc("");
     },
-    onError: (err: any) => {
+    onError: (err: Error) => {
       toast.error(err.message || "Upgrade failed");
     },
   });
 
+  const cancel = useMutation({
+    mutationFn: () => billingApi.cancel(),
+    onSuccess: async (res) => {
+      toast.success(res.message || "Subscription cancelled");
+      setConfirmCancel(false);
+      queryClient.invalidateQueries({ queryKey: ["subscription"] });
+      await refreshUser();
+    },
+    onError: (err: Error) => toast.error(err.message || "Failed to cancel"),
+  });
+
+  const isDemo = subscription?.billing_mode !== "stripe";
+
   const handleUpgradeClick = (plan: SubscriptionPlan) => {
     if (plan.name === "business") {
-      toast.info("Please contact us for Business tier access.");
+      router.push("/#contact");
+      return;
+    }
+    if (plan.name === "basic") {
+      setConfirmCancel(true);
+      return;
+    }
+    if (!isDemo) {
+      // Card details are collected by Stripe Checkout, not by us
+      subscribe.mutate({ plan_name: plan.name, billing_cycle: billingCycle });
       return;
     }
     setSelectedPlan(plan);
@@ -141,7 +197,13 @@ export default function BillingPage() {
   const currentTierKey = user?.tier || "basic";
   const currentTierLabel = TIERS[currentTierKey as keyof typeof TIERS] || currentTierKey;
 
-  const isLoading = loadingSub || loadingTx || loadingTokens || loadingPlans;
+  // Advertise the real yearly saving instead of a hardcoded percentage
+  const yearlySaving = Math.max(
+    0,
+    ...(plans ?? [])
+      .filter((p) => p.price_monthly > 0)
+      .map((p) => Math.round((1 - p.price_yearly / (p.price_monthly * 12)) * 100))
+  );
 
   return (
     <div className="mx-auto max-w-5xl space-y-8">
@@ -178,21 +240,36 @@ export default function BillingPage() {
                   </Badge>
                 </div>
                 <p className="text-muted-foreground">
-                  {subscription?.plan_name || "Free plan"}
+                  {subscription?.plan_details?.display_name || currentTierLabel}
+                  {subscription?.id && ` · billed ${subscription.billing_cycle}`}
                 </p>
                 {subscription?.current_period_end && (
                   <p className="text-sm font-medium">
-                    Renews on {formatDate(subscription.current_period_end)}
+                    {subscription.status === "past_due"
+                      ? "Payment failed – please update your payment method"
+                      : `Renews on ${formatDate(subscription.current_period_end)}`}
+                  </p>
+                )}
+                {isDemo && (
+                  <p className="text-xs text-muted-foreground">
+                    Demo billing: upgrades apply instantly and no card is charged.
                   </p>
                 )}
               </div>
-              <Button onClick={() => {
-                const element = document.getElementById('plans-section');
-                element?.scrollIntoView({ behavior: 'smooth' });
-              }}>
-                <ArrowUpRight className="mr-2 h-4 w-4" />
-                Change Plan
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                {subscription?.id && (
+                  <Button variant="outline" onClick={() => setConfirmCancel(true)}>
+                    Cancel Plan
+                  </Button>
+                )}
+                <Button onClick={() => {
+                  const element = document.getElementById('plans-section');
+                  element?.scrollIntoView({ behavior: 'smooth' });
+                }}>
+                  <ArrowUpRight className="mr-2 h-4 w-4" />
+                  Change Plan
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>
@@ -207,7 +284,7 @@ export default function BillingPage() {
           </div>
           <div className="flex items-center gap-3 bg-secondary/50 p-1.5 rounded-full border">
             <span className={cn("text-sm font-medium px-3 py-1 rounded-full cursor-pointer transition-colors", billingCycle === "monthly" ? "bg-background shadow-sm" : "text-muted-foreground")} onClick={() => setBillingCycle("monthly")}>Monthly</span>
-            <span className={cn("text-sm font-medium px-3 py-1 rounded-full cursor-pointer transition-colors", billingCycle === "yearly" ? "bg-background shadow-sm" : "text-muted-foreground")} onClick={() => setBillingCycle("yearly")}>Yearly <span className="text-primary text-xs ml-1">-20%</span></span>
+            <span className={cn("text-sm font-medium px-3 py-1 rounded-full cursor-pointer transition-colors", billingCycle === "yearly" ? "bg-background shadow-sm" : "text-muted-foreground")} onClick={() => setBillingCycle("yearly")}>Yearly {yearlySaving > 0 && <span className="text-primary text-xs ml-1">-{yearlySaving}%</span>}</span>
           </div>
         </div>
 
@@ -244,7 +321,7 @@ export default function BillingPage() {
                 </CardHeader>
                 <CardContent className="flex-1">
                   <ul className="space-y-3 text-sm">
-                    {(Array.isArray(plan.features) ? plan.features : (typeof plan.features === 'string' ? JSON.parse(plan.features) : [])).map((feature: any, i: number) => (
+                    {(plan.features ?? []).map((feature, i) => (
                       <li key={i} className="flex items-center gap-2">
                         <Check className="h-4 w-4 text-primary shrink-0" />
                         <span className="text-muted-foreground">{feature}</span>
@@ -260,10 +337,16 @@ export default function BillingPage() {
                   <Button
                     variant={isCurrent ? "outline" : "default"}
                     className="w-full"
-                    disabled={isCurrent}
+                    disabled={isCurrent || subscribe.isPending}
                     onClick={() => handleUpgradeClick(plan)}
                   >
-                    {isCurrent ? "Active Plan" : (plan.name === "business" ? "Contact Us" : "Upgrade")}
+                    {isCurrent
+                      ? "Active Plan"
+                      : plan.name === "business"
+                        ? "Contact Us"
+                        : plan.name === "basic"
+                          ? "Downgrade"
+                          : "Upgrade"}
                   </Button>
                 </CardFooter>
               </Card>
@@ -283,7 +366,11 @@ export default function BillingPage() {
           </DialogHeader>
           <form onSubmit={handleProcessPayment} className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="card">Card Number (Mock)</Label>
+              <p className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
+                Demo mode: this server has no payment provider configured. Nothing is
+                charged and card details are not sent anywhere.
+              </p>
+              <Label htmlFor="card">Card Number</Label>
               <div className="relative">
                 <CreditCard className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -332,10 +419,31 @@ export default function BillingPage() {
               </Button>
               <Button type="submit" disabled={subscribe.isPending}>
                 {subscribe.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Pay Securely
+                Activate Plan
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={confirmCancel} onOpenChange={setConfirmCancel}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Switch to the Basic plan?</DialogTitle>
+            <DialogDescription>
+              Your paid plan ends now and limits drop to the Basic tier. Pro features such
+              as your own MCP servers stop working until you upgrade again.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setConfirmCancel(false)}>
+              Keep my plan
+            </Button>
+            <Button variant="destructive" onClick={() => cancel.mutate()} disabled={cancel.isPending}>
+              {cancel.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Cancel plan
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -389,6 +497,31 @@ export default function BillingPage() {
                   </CardContent>
                 </Card>
               </div>
+              {tokenUsage.breakdown?.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Top conversations this month</CardTitle>
+                  </CardHeader>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Conversation</TableHead>
+                        <TableHead className="text-right">Input</TableHead>
+                        <TableHead className="text-right">Output</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {tokenUsage.breakdown.slice(0, 10).map((b) => (
+                        <TableRow key={b.conversation_id}>
+                          <TableCell className="max-w-[320px] truncate">{b.title || "Untitled"}</TableCell>
+                          <TableCell className="text-right">{formatNumber(b.tokens_input)}</TableCell>
+                          <TableCell className="text-right">{formatNumber(b.tokens_output)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </Card>
+              )}
               {tokenUsage.period_start && tokenUsage.period_end && (
                 <Card>
                   <CardHeader>

@@ -13,8 +13,10 @@ from piccolo.columns import (
 from piccolo.columns.defaults.timestamptz import TimestamptzNow
 from piccolo.table import Table
 
+from models.base import JSONTable
 
-class AdminConfig(Table, tablename="admin_config"):
+
+class AdminConfig(JSONTable, tablename="admin_config"):
     """Key-value admin configuration store.
     Used for dynamic runtime settings that override YAML defaults.
     """

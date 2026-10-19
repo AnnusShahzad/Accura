@@ -17,10 +17,12 @@ from piccolo.columns import (
 from piccolo.columns.defaults.timestamptz import TimestamptzNow
 from piccolo.table import Table
 
+from models.base import JSONTable
+
 from models.user import User
 
 
-class Conversation(Table, tablename="conversations"):
+class Conversation(JSONTable, tablename="conversations"):
     """A user chat session / conversation."""
 
     id = UUID(primary_key=True)
@@ -73,7 +75,7 @@ class Iteration(Table, tablename="iterations"):
     created_at = Timestamptz(default=TimestamptzNow())
 
 
-class ChatMessage(Table, tablename="chat_messages"):
+class ChatMessage(JSONTable, tablename="chat_messages"):
     """Audit log / display-friendly message record for a conversation."""
 
     id = UUID(primary_key=True)

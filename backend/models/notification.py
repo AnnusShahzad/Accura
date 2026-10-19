@@ -13,10 +13,12 @@ from piccolo.columns import (
 from piccolo.columns.defaults.timestamptz import TimestamptzNow
 from piccolo.table import Table
 
+from models.base import JSONTable
+
 from models.user import User
 
 
-class Notification(Table, tablename="notifications"):
+class Notification(JSONTable, tablename="notifications"):
     """Individual notification record."""
 
     id = UUID(primary_key=True)

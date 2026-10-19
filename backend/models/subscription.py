@@ -17,10 +17,12 @@ from piccolo.columns import (
 from piccolo.columns.defaults.timestamptz import TimestamptzNow
 from piccolo.table import Table
 
+from models.base import JSONTable
+
 from models.user import User
 
 
-class SubscriptionPlan(Table, tablename="subscription_plans"):
+class SubscriptionPlan(JSONTable, tablename="subscription_plans"):
     """Admin-managed subscription tiers with pricing."""
 
     id = UUID(primary_key=True)

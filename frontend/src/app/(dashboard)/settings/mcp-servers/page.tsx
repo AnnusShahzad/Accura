@@ -5,7 +5,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createMcpServerSchema, type CreateMcpServerFormData } from "@/lib/validations";
-import { mcpApi, adminApi } from "@/lib/api-client";
+import { mcpApi } from "@/lib/api-client";
+import { useAuthStore } from "@/stores/auth-store";
+import Link from "next/link";
+import { Switch } from "@/components/ui/switch";
 import { MCP_TRANSPORTS } from "@/lib/constants";
 import type { MCPServer } from "@/types";
 import {
@@ -63,21 +66,20 @@ export default function McpServersPage() {
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  const { data: globalServers, isLoading: loadingGlobal } = useQuery({
-    queryKey: ["mcp-servers", "global"],
-    queryFn: async () => {
-      const res = await adminApi.getMcpServers();
-      return res.data;
-    },
-  });
+  const { user } = useAuthStore();
+  const canAddServers = user?.tier === "pro" || user?.tier === "business";
 
-  const { data: userServers, isLoading: loadingUser } = useQuery({
-    queryKey: ["mcp-servers", "user"],
+  // One request returns both the user's servers and the platform's
+  // global ones (the admin endpoint is admin-only and 403s for users).
+  const { data: servers, isLoading } = useQuery({
+    queryKey: ["mcp-servers"],
     queryFn: async () => {
       const res = await mcpApi.list();
       return res.data;
     },
   });
+  const globalServers = servers?.filter((s) => s.is_global);
+  const userServers = servers?.filter((s) => !s.is_global);
 
   const createServer = useMutation({
     mutationFn: (data: CreateMcpServerFormData) => mcpApi.create(data),
@@ -91,8 +93,18 @@ export default function McpServersPage() {
 
   const testServer = useMutation({
     mutationFn: (id: string) => mcpApi.test(id),
-    onSuccess: () => toast.success("Connection successful"),
-    onError: () => toast.error("Connection failed"),
+    onSuccess: (res) => {
+      const tools = res.data.tools.map((t) => t.name).join(", ");
+      toast.success(res.message, { description: tools ? `Tools: ${tools}` : "No tools exposed" });
+    },
+    onError: (e: Error) => toast.error(e.message || "Connection failed"),
+  });
+
+  const toggleServer = useMutation({
+    mutationFn: ({ id, is_active }: { id: string; is_active: boolean }) =>
+      mcpApi.update(id, { is_active }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["mcp-servers"] }),
+    onError: (e: Error) => toast.error(e.message || "Failed to update server"),
   });
 
   const deleteServer = useMutation({
@@ -101,6 +113,7 @@ export default function McpServersPage() {
       queryClient.invalidateQueries({ queryKey: ["mcp-servers"] });
       toast.success("MCP server deleted");
     },
+    onError: (e: Error) => toast.error(e.message || "Failed to delete server"),
   });
 
   const form = useForm<CreateMcpServerFormData>({
@@ -110,11 +123,9 @@ export default function McpServersPage() {
       url: "",
       api_key: "",
       description: "",
-      transport: "sse",
+      transport: "http",
     },
   });
-
-  const isLoading = loadingGlobal || loadingUser;
 
   const ServerCard = ({ server, global: isGlobal }: { server: MCPServer; global?: boolean }) => (
     <Card>
@@ -130,8 +141,10 @@ export default function McpServersPage() {
                 Global
               </Badge>
             )}
-            {server.is_active && (
+            {server.is_active ? (
               <Badge className="bg-green-500/15 text-green-600">Active</Badge>
+            ) : (
+              <Badge variant="outline">Disabled</Badge>
             )}
           </div>
           {server.description && (
@@ -141,6 +154,13 @@ export default function McpServersPage() {
         </div>
         {!isGlobal && (
           <div className="flex items-center gap-2">
+            <Switch
+              checked={server.is_active}
+              aria-label={server.is_active ? "Disable server" : "Enable server"}
+              onCheckedChange={(checked) =>
+                toggleServer.mutate({ id: server.id, is_active: checked })
+              }
+            />
             <Button
               variant="outline"
               size="sm"
@@ -192,7 +212,7 @@ export default function McpServersPage() {
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button disabled={!canAddServers}>
               <Plus className="mr-2 h-4 w-4" />
               Add Server
             </Button>
@@ -229,7 +249,7 @@ export default function McpServersPage() {
                     <FormItem>
                       <FormLabel>URL</FormLabel>
                       <FormControl>
-                        <Input placeholder="https://mcp.example.com" {...field} />
+                        <Input placeholder="https://mcp.example.com/mcp" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -298,6 +318,20 @@ export default function McpServersPage() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {!canAddServers && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
+            <p className="text-sm">
+              Connecting your own MCP servers is available on the Pro and Business plans.
+              Platform servers below are available to everyone.
+            </p>
+            <Button size="sm" asChild>
+              <Link href="/settings/billing">Upgrade</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {isLoading ? (
         <div className="space-y-4">

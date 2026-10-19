@@ -71,17 +71,21 @@ export default function AdminMcpServersPage() {
   });
 
   const saveMutation = useMutation({
-    mutationFn: (data: CreateMcpServerFormData) =>
-      editing
-        ? adminApi.updateMcpServer(editing.id, data)
-        : adminApi.createMcpServer(data),
+    mutationFn: (data: CreateMcpServerFormData) => {
+      // A blank key field means "keep the current key", not "remove it"
+      const { api_key, ...rest } = data;
+      const payload = api_key ? { ...rest, api_key } : rest;
+      return editing
+        ? adminApi.updateMcpServer(editing.id, payload)
+        : adminApi.createMcpServer(payload);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "mcp-servers"] });
       toast.success(editing ? "Server updated" : "Server added");
       setIsDialogOpen(false);
       setEditing(null);
     },
-    onError: () => toast.error("Failed to save server"),
+    onError: (e: Error) => toast.error(e.message || "Failed to save server"),
   });
 
   const deleteMutation = useMutation({
@@ -90,6 +94,7 @@ export default function AdminMcpServersPage() {
       queryClient.invalidateQueries({ queryKey: ["admin", "mcp-servers"] });
       toast.success("Server deleted");
     },
+    onError: (e: Error) => toast.error(e.message || "Failed to delete server"),
   });
 
   const form = useForm<CreateMcpServerFormData>({
@@ -99,7 +104,7 @@ export default function AdminMcpServersPage() {
       url: "",
       api_key: "",
       description: "",
-      transport: "sse",
+      transport: "http",
     },
     values: editing
       ? {
@@ -119,7 +124,7 @@ export default function AdminMcpServersPage() {
       url: "",
       api_key: "",
       description: "",
-      transport: "sse",
+      transport: "http",
     });
     setIsDialogOpen(true);
   };

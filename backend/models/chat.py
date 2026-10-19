@@ -34,7 +34,7 @@ class Conversation(JSONTable, tablename="conversations"):
     threshold = Numeric(digits=(5, 2), null=True, default=None)  # per-chat override
     max_iterations = Integer(null=True, default=None)  # per-chat override
     timeout_seconds = Integer(null=True, default=None)  # per-chat override
-    status = Varchar(length=20, default="active")  # active | completed | archived
+    status = Varchar(length=20, default="active")  # active | completed | failed | archived
     best_response = Text(default="")
     best_score = Numeric(digits=(5, 2), default=decimal.Decimal("0"))
     tokens_input = Integer(default=0)
@@ -63,6 +63,7 @@ class Iteration(Table, tablename="iterations"):
     id = UUID(primary_key=True)
     conversation = UUID(references=Conversation, index=True)
     agent = UUID(references=ChatAgent, index=True)
+    turn = Integer(default=1)  # which user message (1-based) this answers
     iteration_number = Integer(default=1)
     rephrased_prompt = Text(default="")
     response = Text(default="")

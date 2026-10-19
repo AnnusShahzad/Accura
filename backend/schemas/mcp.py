@@ -14,7 +14,7 @@ class CreateMCPServerRequest(BaseModel):
     url: str = Field(min_length=1)
     api_key: Optional[str] = None
     description: str = ""
-    transport: str = Field(default="sse", pattern="^(sse|stdio|http)$")
+    transport: str = Field(default="http", pattern="^(http|sse)$")
     headers: dict = {}
     metadata: dict = {}
 
@@ -24,7 +24,7 @@ class UpdateMCPServerRequest(BaseModel):
     url: Optional[str] = None
     api_key: Optional[str] = None
     description: Optional[str] = None
-    transport: Optional[str] = Field(None, pattern="^(sse|stdio|http)$")
+    transport: Optional[str] = Field(None, pattern="^(http|sse)$")
     headers: Optional[dict] = None
     metadata: Optional[dict] = None
     is_active: Optional[bool] = None

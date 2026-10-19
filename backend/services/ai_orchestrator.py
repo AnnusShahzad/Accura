@@ -10,19 +10,23 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
+from datetime import datetime, timezone
 from typing import Any
 
 from config import settings
-from models.chat import ChatAgent, Conversation, Iteration, ChatMessage
+from models.chat import ChatAgent, ChatMessage, Conversation, Iteration
 from models.settings import UserSettings
 from services.evaluator import evaluate_response
 from services.generator import generate_response
 from services.reprompt import rephrase_prompt
 from services.token_tracker import record_tokens
 from services.notification_service import send_notification
-from utils.exceptions import TimeoutError as AccuraTimeout
 
 logger = logging.getLogger("accura.orchestrator")
+
+# How much earlier conversation is replayed to the models
+_HISTORY_MESSAGES = 10
+_HISTORY_CHARS = 4000
 
 
 async def _resolve_settings(user_id: str, conversation: dict) -> dict:
@@ -53,6 +57,42 @@ async def _resolve_settings(user_id: str, conversation: dict) -> dict:
     return defaults
 
 
+async def _load_history(conversation_id: str) -> tuple[list[dict], int]:
+    """Return (earlier user/assistant turns, current turn number).
+
+    The newest user message is the prompt being answered, so it is left
+    out of the history.
+    """
+    messages = await ChatMessage.select(
+        ChatMessage.role, ChatMessage.content
+    ).where(
+        (ChatMessage.conversation == conversation_id)
+        & (ChatMessage.role.is_in(["user", "assistant"]))
+    ).order_by(ChatMessage.created_at).run()
+
+    turn = sum(1 for m in messages if m["role"] == "user") or 1
+    if messages and messages[-1]["role"] == "user":
+        messages = messages[:-1]
+    history = [m for m in messages if m["content"]][-_HISTORY_MESSAGES:]
+
+    # Keep the replay bounded: trim the oldest messages first.
+    while history and sum(len(m["content"]) for m in history) > _HISTORY_CHARS * 2:
+        history.pop(0)
+    return history, turn
+
+
+def _history_as_text(history: list[dict]) -> str:
+    text = "\n\n".join(f"{m['role'].upper()}: {m['content']}" for m in history)
+    return text[-_HISTORY_CHARS:]
+
+
+async def _publish_progress(conversation_id: str, progress: dict) -> None:
+    await Conversation.update({
+        Conversation.metadata: dict(progress),
+        Conversation.updated_at: datetime.now(timezone.utc),
+    }).where(Conversation.id == conversation_id).run()
+
+
 async def _run_single_agent_loop(
     user_id: str,
     conversation_id: str,
@@ -61,25 +101,31 @@ async def _run_single_agent_loop(
     eval_provider: str,
     eval_model: str,
     resolved: dict,
+    *,
+    turn: int,
+    history: list[dict],
+    progress: dict,
     search_enabled: bool = False,
-    mcp_server_ids: list[str] | None = None,
+    mcp_tools: list[dict] | None = None,
 ) -> dict:
     """Execute the generate → evaluate → rephrase loop for one agent."""
 
     threshold = resolved["threshold"]
     max_iterations = resolved["max_iterations"]
     timeout_seconds = resolved["timeout_seconds"]
+    context = _history_as_text(history)
 
     current_prompt = prompt
     best_response = ""
     best_score = 0.0
     total_tokens_in = 0
     total_tokens_out = 0
+    last_error: str | None = None
 
     for iteration_num in range(1, max_iterations + 1):
         logger.info(
-            "Conversation %s | Agent %s | Iteration %d/%d",
-            conversation_id, agent["id"], iteration_num, max_iterations,
+            "Conversation %s | Agent %s | Turn %d | Iteration %d/%d",
+            conversation_id, agent["id"], turn, iteration_num, max_iterations,
         )
 
         # --- Generate ---
@@ -91,9 +137,10 @@ async def _run_single_agent_loop(
                     provider=agent["provider"],
                     model=agent["model"],
                     prompt=current_prompt,
+                    history=history,
                     search_enabled=search_enabled,
                     search_query=prompt if search_enabled else None,
-                    mcp_server_ids=mcp_server_ids,
+                    mcp_tools=mcp_tools,
                     timeout_seconds=timeout_seconds,
                 ),
                 timeout=timeout_seconds,
@@ -101,75 +148,52 @@ async def _run_single_agent_loop(
         except asyncio.TimeoutError:
             logger.warning("Agent %s timed out on iteration %d", agent["id"], iteration_num)
             gen_result = {
-                "response": best_response or "(timed out – no response)",
+                "response": "",
                 "tokens_input": 0,
                 "tokens_output": 0,
                 "duration_ms": timeout_seconds * 1000,
             }
             timed_out = True
+            last_error = f"{agent['model']} timed out after {timeout_seconds}s"
 
         response_text = gen_result["response"]
-        total_tokens_in += gen_result["tokens_input"]
-        total_tokens_out += gen_result["tokens_output"]
+        iter_tokens_in = gen_result["tokens_input"]
+        iter_tokens_out = gen_result["tokens_output"]
 
-        # --- Evaluate ---
-        eval_result = await evaluate_response(
-            user_id=user_id,
-            provider=eval_provider,
-            model=eval_model,
-            original_prompt=prompt,
-            ai_response=response_text,
-            timeout_seconds=timeout_seconds,
-        )
-        total_tokens_in += eval_result["tokens_input"]
-        total_tokens_out += eval_result["tokens_output"]
-
-        score = eval_result["score"]
-        reasoning = eval_result["reasoning"]
-
-        # --- Store iteration ---
-        iter_id = str(uuid.uuid4())
-        await Iteration.insert(
-            Iteration(
-                id=iter_id,
-                conversation=conversation_id,
-                agent=agent["id"],
-                iteration_number=iteration_num,
-                rephrased_prompt=current_prompt if iteration_num > 1 else "",
-                response=response_text,
-                score=score,
-                evaluation_reasoning=reasoning,
-                tokens_input=gen_result["tokens_input"],
-                tokens_output=gen_result["tokens_output"],
-                timed_out=timed_out,
-                duration_ms=gen_result.get("duration_ms", 0),
+        # --- Evaluate (nothing to evaluate after a timeout) ---
+        score = 0.0
+        reasoning = "Generation timed out." if timed_out else ""
+        if response_text.strip():
+            eval_result = await evaluate_response(
+                user_id=user_id,
+                provider=eval_provider,
+                model=eval_model,
+                original_prompt=prompt,
+                ai_response=response_text,
+                context=context,
+                timeout_seconds=timeout_seconds,
             )
-        ).run()
+            iter_tokens_in += eval_result["tokens_input"]
+            iter_tokens_out += eval_result["tokens_output"]
+            score = eval_result["score"]
+            reasoning = eval_result["reasoning"]
+        elif not timed_out:
+            reasoning = "The model returned an empty response."
 
-        if score > best_score:
-            best_score = score
+        if score > best_score or (not best_response and response_text):
+            best_score = max(best_score, score)
             best_response = response_text
 
-        # --- Emit live progress into conversation metadata ---
-        await Conversation.update({
-            Conversation.metadata: {
-                "current_iteration": iteration_num,
-                "current_best_score": round(float(best_score), 2),
-                "max_iterations": max_iterations,
-            },
-        }).where(Conversation.id == conversation_id).run()
-
-        # --- Check threshold ---
-        if score >= threshold:
-            logger.info("Threshold met: %.2f >= %.2f", score, threshold)
-            break
-
-        if timed_out:
-            break
+        progress["current_iteration"] = max(progress.get("current_iteration", 0), iteration_num)
+        progress["current_best_score"] = round(max(progress.get("current_best_score", 0.0), best_score), 2)
 
         # --- Rephrase for next iteration ---
-        if iteration_num < max_iterations:
-            reprompt_model = settings.get("ai.default_reprompt_model", eval_model)
+        done = score >= threshold or timed_out or iteration_num >= max_iterations
+        if done and score >= threshold:
+            logger.info("Threshold met: %.2f >= %.2f", score, threshold)
+        next_prompt = current_prompt
+        if not done:
+            reprompt_model = settings.get("ai.default_reprompt_model") or eval_model
             reprompt_result = await rephrase_prompt(
                 user_id=user_id,
                 provider=eval_provider,
@@ -180,12 +204,42 @@ async def _run_single_agent_loop(
                 score=score,
                 timeout_seconds=timeout_seconds,
             )
-            current_prompt = reprompt_result["rephrased_prompt"]
-            total_tokens_in += reprompt_result["tokens_input"]
-            total_tokens_out += reprompt_result["tokens_output"]
+            next_prompt = reprompt_result["rephrased_prompt"] or current_prompt
+            iter_tokens_in += reprompt_result["tokens_input"]
+            iter_tokens_out += reprompt_result["tokens_output"]
+
+        # --- Store iteration (tokens = generate + evaluate + rephrase) ---
+        await Iteration.insert(
+            Iteration(
+                id=str(uuid.uuid4()),
+                conversation=conversation_id,
+                agent=agent["id"],
+                turn=turn,
+                iteration_number=iteration_num,
+                rephrased_prompt=current_prompt if iteration_num > 1 else "",
+                response=response_text,
+                score=score,
+                evaluation_reasoning=reasoning,
+                tokens_input=iter_tokens_in,
+                tokens_output=iter_tokens_out,
+                timed_out=timed_out,
+                duration_ms=gen_result.get("duration_ms", 0),
+            )
+        ).run()
+        total_tokens_in += iter_tokens_in
+        total_tokens_out += iter_tokens_out
+        await _publish_progress(conversation_id, progress)
+
+        if done:
+            break
+        current_prompt = next_prompt
+
+    if not best_response and last_error:
+        raise RuntimeError(last_error)
 
     return {
-        "agent_id": agent["id"],
+        "agent_id": str(agent["id"]),
+        "model": agent["model"],
         "best_response": best_response,
         "best_score": best_score,
         "total_tokens_in": total_tokens_in,
@@ -193,15 +247,58 @@ async def _run_single_agent_loop(
     }
 
 
+async def _mark_failed(conversation_id: str, user_id: str, reason: str) -> None:
+    logger.error("Conversation %s failed: %s", conversation_id, reason)
+    await Conversation.update({
+        Conversation.status: "failed",
+        Conversation.metadata: {"error": reason},
+        Conversation.updated_at: datetime.now(timezone.utc),
+    }).where(Conversation.id == conversation_id).run()
+    await ChatMessage.insert(
+        ChatMessage(
+            id=str(uuid.uuid4()),
+            conversation=conversation_id,
+            role="system",
+            content=reason,
+            metadata={"type": "error"},
+        )
+    ).run()
+    await send_notification(
+        user_id=user_id,
+        title="Response Failed",
+        body=reason,
+        metadata={"conversation_id": conversation_id},
+    )
+
+
 async def orchestrate_conversation(
     conversation_id: str,
     user_id: str,
-) -> dict:
+    agent_ids: list[str] | None = None,
+) -> dict | None:
     """
     Main orchestration entry-point for a conversation.
-    Runs all generator agents in parallel, evaluates, and picks the best.
-    """
 
+    Runs all active generator agents in parallel (or only *agent_ids*,
+    e.g. an agent added mid-chat), evaluates, and stores the best
+    answer. Any failure leaves the conversation in status "failed" with
+    a readable reason instead of spinning in "active" forever.
+    """
+    try:
+        return await _orchestrate(conversation_id, user_id, agent_ids)
+    except Exception as exc:
+        logger.exception("Orchestration crashed for %s", conversation_id)
+        reason = getattr(exc, "message", None) or str(exc) or type(exc).__name__
+        try:
+            still_exists = await Conversation.exists().where(Conversation.id == conversation_id).run()
+            if still_exists:  # it may have been deleted mid-run
+                await _mark_failed(conversation_id, user_id, reason)
+        except Exception:
+            logger.exception("Could not record failure for %s", conversation_id)
+        return None
+
+
+async def _orchestrate(conversation_id: str, user_id: str, agent_ids: list[str] | None) -> dict:
     conversation = await Conversation.select().where(
         Conversation.id == conversation_id
     ).first().run()
@@ -209,13 +306,17 @@ async def orchestrate_conversation(
         raise ValueError("Conversation not found")
 
     resolved = await _resolve_settings(user_id, conversation)
+    history, turn = await _load_history(conversation_id)
 
-    # Fetch all active generator agents
-    agents = await ChatAgent.select().where(
+    # Fetch generator agents
+    query = ChatAgent.select().where(
         (ChatAgent.conversation == conversation_id)
         & (ChatAgent.role == "generator")
-        & (ChatAgent.is_active == True)
-    ).run()
+        & (ChatAgent.is_active == True)  # noqa: E712
+    ).order_by(ChatAgent.created_at)
+    agents = await query.run()
+    if agent_ids:
+        agents = [a for a in agents if str(a["id"]) in set(agent_ids)]
     if not agents:
         raise ValueError("No generator agents configured for this conversation")
 
@@ -227,53 +328,75 @@ async def orchestrate_conversation(
     eval_provider = evaluator_agent["provider"] if evaluator_agent else "openai"
     eval_model = evaluator_agent["model"] if evaluator_agent else settings.get("ai.default_evaluator_model", "gpt-5.1")
 
-    # Get user MCP servers
-    from services.mcp_service import get_user_mcp_servers
-    mcp_servers = await get_user_mcp_servers(user_id)
-    mcp_ids = [str(s["id"]) for s in mcp_servers]
+    # MCP tools are discovered once per run and shared by every agent
+    from services.mcp_service import discover_tools, get_user_mcp_servers
 
-    # Run all agents in parallel
-    tasks = [
-        _run_single_agent_loop(
-            user_id=user_id,
-            conversation_id=conversation_id,
-            agent=agent,
-            prompt=conversation["prompt"],
-            eval_provider=eval_provider,
-            eval_model=eval_model,
-            resolved=resolved,
-            search_enabled=conversation.get("search_enabled", False),
-            mcp_server_ids=mcp_ids if mcp_ids else None,
-        )
-        for agent in agents
-    ]
+    mcp_tools = await discover_tools(await get_user_mcp_servers(user_id))
 
-    results = await asyncio.gather(*tasks, return_exceptions=True)
+    progress: dict[str, Any] = {
+        "turn": turn,
+        "current_iteration": 0,
+        "current_best_score": 0.0,
+        "max_iterations": resolved["max_iterations"],
+        "threshold": resolved["threshold"],
+        "agents": len(agents),
+    }
+    await _publish_progress(conversation_id, progress)
+
+    results = await asyncio.gather(
+        *[
+            _run_single_agent_loop(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                agent=agent,
+                prompt=conversation["prompt"],
+                eval_provider=eval_provider,
+                eval_model=eval_model,
+                resolved=resolved,
+                turn=turn,
+                history=history,
+                progress=progress,
+                search_enabled=bool(conversation.get("search_enabled", False)),
+                mcp_tools=mcp_tools or None,
+            )
+            for agent in agents
+        ],
+        return_exceptions=True,
+    )
 
     # Pick best result
-    best_overall: dict[str, Any] = {"best_response": "", "best_score": 0.0}
-    total_in = 0
-    total_out = 0
+    successes = [r for r in results if not isinstance(r, BaseException)]
+    failures = [r for r in results if isinstance(r, BaseException)]
+    for f in failures:
+        logger.error("Agent loop failed: %s", f)
 
-    for r in results:
-        if isinstance(r, Exception):
-            logger.error("Agent loop failed: %s", r)
-            continue
-        total_in += r["total_tokens_in"]
-        total_out += r["total_tokens_out"]
-        if r["best_score"] > best_overall["best_score"]:
-            best_overall = r
-
-    # Update conversation
-    await Conversation.update({
-        Conversation.best_response: best_overall["best_response"],
-        Conversation.best_score: best_overall["best_score"],
-        Conversation.tokens_input: total_in,
-        Conversation.tokens_output: total_out,
-        Conversation.status: "completed",
-    }).where(Conversation.id == conversation_id).run()
-
+    total_in = sum(r["total_tokens_in"] for r in successes)
+    total_out = sum(r["total_tokens_out"] for r in successes)
     await record_tokens(conversation_id, total_in, total_out)
+
+    usable = [r for r in successes if r["best_response"]]
+    if not usable:
+        first = failures[0] if failures else None
+        reason = (getattr(first, "message", None) or str(first)) if first else ""
+        raise RuntimeError(reason or "No agent produced a response")
+
+    best = max(usable, key=lambda r: r["best_score"])
+    is_alternative = bool(agent_ids)
+
+    # A mid-chat agent only replaces the stored best answer if it beats it
+    current_best = float(conversation.get("best_score") or 0)
+    if not is_alternative or best["best_score"] > current_best:
+        await Conversation.update({
+            Conversation.best_response: best["best_response"],
+            Conversation.best_score: best["best_score"],
+        }).where(Conversation.id == conversation_id).run()
+
+    progress["current_best_score"] = round(best["best_score"], 2)
+    await Conversation.update({
+        Conversation.status: "completed",
+        Conversation.metadata: progress,
+        Conversation.updated_at: datetime.now(timezone.utc),
+    }).where(Conversation.id == conversation_id).run()
 
     # Store final assistant message
     await ChatMessage.insert(
@@ -281,9 +404,15 @@ async def orchestrate_conversation(
             id=str(uuid.uuid4()),
             conversation=conversation_id,
             role="assistant",
-            content=best_overall["best_response"],
-            score=best_overall["best_score"],
-            metadata={"agent_id": best_overall.get("agent_id", "")},
+            content=best["best_response"],
+            score=best["best_score"],
+            metadata={
+                "agent_id": best["agent_id"],
+                "model": best["model"],
+                "turn": turn,
+                "alternative": is_alternative,
+                "failed_agents": len(failures),
+            },
         )
     ).run()
 
@@ -291,26 +420,18 @@ async def orchestrate_conversation(
     await send_notification(
         user_id=user_id,
         title="Response Ready",
-        body=f"Your conversation has completed with a score of {best_overall['best_score']:.1f}%",
+        body=f"\"{conversation.get('title') or 'Your conversation'}\" completed with a score of {best['best_score']:.1f}%",
         metadata={"conversation_id": conversation_id},
     )
 
     # Auto-generate title if user didn't provide one
-    current_title = conversation.get("title", "")
-    logger.info("Current title for %s: %r", conversation_id, current_title)
-    if current_title in ("", "New Conversation"):
+    if turn == 1 and not is_alternative and (conversation.get("title") or "") in ("", "New Conversation"):
         from services.title_generator import generate_title
-
-        # Use the first generator agent (proven to work - it produced the response)
-        gen_agent = agents[0] if agents else None
-        title_provider = gen_agent["provider"] if gen_agent else eval_provider
-        title_model = gen_agent["model"] if gen_agent else eval_model
 
         try:
             auto_title = await generate_title(
-                user_id, title_provider, title_model, conversation["prompt"]
+                user_id, agents[0]["provider"], agents[0]["model"], conversation["prompt"]
             )
-            logger.info("Auto-generated title for %s: %r", conversation_id, auto_title)
             await Conversation.update({
                 Conversation.title: auto_title,
             }).where(Conversation.id == conversation_id).run()
@@ -319,10 +440,9 @@ async def orchestrate_conversation(
 
     return {
         "conversation_id": conversation_id,
-        "best_response": best_overall["best_response"],
-        "best_score": best_overall["best_score"],
+        "best_response": best["best_response"],
+        "best_score": best["best_score"],
         "tokens_input": total_in,
         "tokens_output": total_out,
         "status": "completed",
     }
-

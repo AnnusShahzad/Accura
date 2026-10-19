@@ -28,7 +28,7 @@ class MCPServer(JSONTable, tablename="mcp_servers"):
     description = Text(default="")
     is_active = Boolean(default=True)
     is_global = Boolean(default=False)
-    transport = Varchar(length=20, default="sse")  # sse | stdio | http
+    transport = Varchar(length=20, default="http")  # http (Streamable HTTP) | sse (legacy)
     headers = JSONB(default={})
     metadata = JSONB(default={})
     created_at = Timestamptz(default=TimestamptzNow())

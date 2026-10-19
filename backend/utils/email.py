@@ -71,6 +71,7 @@ async def send_email(
             start_tls=use_tls if not is_smtps else False,
         )
         logger.info("Email sent to %s: %s", to, subject)
-    except Exception:
-        logger.exception("Failed to send email to %s", to)
+    except Exception as exc:
+        # Callers decide whether this is fatal; keep the log to one line.
+        logger.warning("Failed to send email to %s: %s", to, exc)
         raise

@@ -103,6 +103,14 @@ def create_app() -> Sanic:
         await ensure_schema()
         await _seed_subscription_plans()
 
+    @app.after_server_start
+    async def start_background_jobs(app_instance):
+        app_instance.add_task(_renewal_loop(), name="subscription-renewals")
+
+    @app.before_server_stop
+    async def stop_background_jobs(app_instance):
+        await app_instance.cancel_task("subscription-renewals", raise_exception=False)
+
     @app.after_server_stop
     async def shutdown(app_instance):
         engine = Conversation._meta.db
@@ -110,6 +118,21 @@ def create_app() -> Sanic:
             await engine.close_connection_pool()
 
     return app
+
+
+async def _renewal_loop():
+    """Periodically roll over subscriptions whose billing period ended."""
+    import asyncio
+
+    from services.billing_service import renew_due_subscriptions
+
+    interval = max(60, int(settings.get("billing.renewal_check_interval", 3600)))
+    while True:
+        try:
+            await renew_due_subscriptions()
+        except Exception:
+            logger.exception("Subscription renewal job failed")
+        await asyncio.sleep(interval)
 
 
 async def _seed_subscription_plans():

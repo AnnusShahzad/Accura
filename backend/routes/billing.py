@@ -6,26 +6,36 @@ POST   /api/v1/billing/cancel
 GET    /api/v1/billing/subscription
 GET    /api/v1/billing/transactions
 GET    /api/v1/billing/tokens
+POST   /api/v1/billing/webhook          Stripe webhook (signature verified)
 """
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+import logging
+from datetime import datetime, timezone
 
 from sanic import Blueprint, Request
 
+from config import settings
 from middleware.auth_middleware import require_auth
-from models.subscription import Subscription, SubscriptionPlan
-from schemas.billing import CancelSubscriptionRequest, CreateSubscriptionRequest
+from schemas.billing import CreateSubscriptionRequest
 from services.billing_service import (
     cancel_subscription,
+    create_checkout_session,
     create_subscription,
+    get_current_subscription,
+    get_plan_by_name,
     get_plans,
     get_transactions,
+    handle_stripe_event,
+    stripe_enabled,
+    verify_stripe_signature,
 )
 from services.token_tracker import get_user_token_usage
 from utils.exceptions import BillingError, NotFoundError
 from utils.responses import error, success, validation_error, int_arg
+
+logger = logging.getLogger("accura.billing")
 
 bp = Blueprint("billing", url_prefix="/api/v1/billing")
 
@@ -45,16 +55,34 @@ async def subscribe(request: Request):
     except Exception as exc:
         return validation_error(exc)
 
-    user_id = str(request.ctx.user["id"])
+    user = request.ctx.user
+    user_id = str(user["id"])
 
     # Business tier requires contact
     if body.plan_name == "business":
         return error(
-            "Business accounts require contacting us. Please use the Contact page.",
+            "Business accounts require contacting us. Please use the contact form.",
             status=403,
         )
 
+    plan = await get_plan_by_name(body.plan_name)
+    if not plan or not plan["is_active"]:
+        return error(f"Plan '{body.plan_name}' not found", status=404)
+
     try:
+        # Moving to the free plan is a cancellation of the paid one
+        if body.plan_name == "basic":
+            try:
+                await cancel_subscription(user_id)
+            except NotFoundError:
+                pass
+            return success(await get_current_subscription(user_id), message="You are on the Basic plan")
+
+        price = plan["price_yearly"] if body.billing_cycle == "yearly" else plan["price_monthly"]
+        if price > 0 and stripe_enabled():
+            url = await create_checkout_session(user, body.plan_name, body.billing_cycle)
+            return success({"checkout_url": url}, message="Redirecting to checkout")
+
         sub = await create_subscription(
             user_id=user_id,
             plan_name=body.plan_name,
@@ -63,7 +91,7 @@ async def subscribe(request: Request):
     except (NotFoundError, BillingError) as exc:
         return error(exc.message, status=exc.status_code)
 
-    return success(sub, message="Subscription created", status=201)
+    return success(sub, message="Subscription activated", status=201)
 
 
 @bp.post("/cancel")
@@ -73,7 +101,7 @@ async def cancel(request: Request):
 
     try:
         await cancel_subscription(user_id)
-    except NotFoundError as exc:
+    except (NotFoundError, BillingError) as exc:
         return error(exc.message, status=exc.status_code)
 
     return success(message="Subscription cancelled – reverted to Basic")
@@ -82,21 +110,31 @@ async def cancel(request: Request):
 @bp.get("/subscription")
 @require_auth
 async def get_subscription(request: Request):
-    user_id = str(request.ctx.user["id"])
+    return success(await get_current_subscription(str(request.ctx.user["id"])))
 
-    sub = await Subscription.select().where(
-        (Subscription.user == user_id) & (Subscription.status == "active")
-    ).first().run()
 
-    if not sub:
-        return success({"plan": "basic", "status": "active"})
+@bp.post("/webhook")
+async def stripe_webhook(request: Request):
+    """Stripe webhook endpoint. Public, authenticated by signature."""
+    secret = settings.get("billing.stripe_webhook_secret", "")
+    if not secret:
+        return error("Stripe webhooks are not configured", status=503)
+    try:
+        event = verify_stripe_signature(
+            request.body, request.headers.get("Stripe-Signature", ""), secret
+        )
+    except BillingError as exc:
+        return error(exc.message, status=400)
+    except ValueError:
+        return error("Invalid payload", status=400)
 
-    plan = await SubscriptionPlan.select().where(
-        SubscriptionPlan.id == sub["plan"]
-    ).first().run()
-
-    sub["plan_details"] = plan
-    return success(sub)
+    try:
+        await handle_stripe_event(event)
+    except Exception:
+        # Non-2xx makes Stripe retry, which is what we want here
+        logger.exception("Failed to handle Stripe event %s", event.get("id"))
+        return error("Webhook handling failed", status=500)
+    return success({"received": True})
 
 
 @bp.get("/transactions")

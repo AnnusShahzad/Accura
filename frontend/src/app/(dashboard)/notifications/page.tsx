@@ -24,6 +24,8 @@ import {
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
+import { Trash2 } from "lucide-react";
 
 const channelIcons: Record<string, React.ReactNode> = {
   in_app: <Info className="h-5 w-5 text-blue-500" />,
@@ -34,6 +36,13 @@ const channelIcons: Record<string, React.ReactNode> = {
 
 export default function NotificationsPage() {
   const queryClient = useQueryClient();
+  const router = useRouter();
+
+  const remove = useMutation({
+    mutationFn: (id: string) => notificationsApi.delete(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+    onError: (e: Error) => toast.error(e.message || "Failed to delete notification"),
+  });
 
   const { data: notifications, isLoading } = useQuery({
     queryKey: ["notifications"],
@@ -113,6 +122,10 @@ export default function NotificationsPage() {
                   if (!notification.is_read) {
                     markRead.mutate(notification.id);
                   }
+                  const conversationId = notification.metadata?.conversation_id;
+                  if (typeof conversationId === "string") {
+                    router.push(`/chat/${conversationId}`);
+                  }
                 }}
               >
                 <CardContent className="flex items-start gap-4 py-4">
@@ -135,6 +148,18 @@ export default function NotificationsPage() {
                       {formatDate(notification.created_at)}
                     </p>
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                    aria-label="Delete notification"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      remove.mutate(notification.id);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 text-muted-foreground" />
+                  </Button>
                 </CardContent>
               </Card>
             ))}

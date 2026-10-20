@@ -15,7 +15,7 @@ export function Hero() {
   const guestEnabled = !!config?.guest.enabled;
 
   return (
-    <section className="relative overflow-hidden py-24 sm:py-32">
+    <section className="relative overflow-hidden py-16 sm:py-24 lg:py-32">
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
           <div className="mb-6 flex items-center justify-center gap-2">

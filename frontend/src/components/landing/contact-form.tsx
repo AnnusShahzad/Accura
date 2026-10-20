@@ -61,7 +61,7 @@ export function ContactForm() {
   };
 
   return (
-    <section className="py-24 sm:py-32" id="contact">
+    <section className="py-16 sm:py-24 lg:py-32" id="contact">
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <div className="mx-auto max-w-2xl">
           <Card>

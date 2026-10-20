@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   useConversation,
   useRenameConversation,
@@ -288,6 +289,19 @@ export default function ChatDetailPage({
   const hideScoring = settings?.hide_evaluator_scoring ?? false;
   const isActive = conversation?.status === "active";
   const isFailed = conversation?.status === "failed";
+
+  // When a run finishes, polling stops; fetch messages and the sidebar
+  // list once more so nothing written in the final moments is missed.
+  const queryClient = useQueryClient();
+  const wasActive = useRef(false);
+  useEffect(() => {
+    if (wasActive.current && !isActive) {
+      queryClient.invalidateQueries({ queryKey: ["conversation-messages", id] });
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications", "unread-count"] });
+    }
+    wasActive.current = isActive;
+  }, [isActive, id, queryClient]);
 
   // Auto-scroll to the newest message. (A ref on ScrollArea points at its
   // root, not the scrolling viewport, so scrollTop there did nothing.)

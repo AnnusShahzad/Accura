@@ -249,11 +249,7 @@ async def _run_single_agent_loop(
 
 async def _mark_failed(conversation_id: str, user_id: str, reason: str) -> None:
     logger.error("Conversation %s failed: %s", conversation_id, reason)
-    await Conversation.update({
-        Conversation.status: "failed",
-        Conversation.metadata: {"error": reason},
-        Conversation.updated_at: datetime.now(timezone.utc),
-    }).where(Conversation.id == conversation_id).run()
+    # Message first, status second (clients stop polling on the status)
     await ChatMessage.insert(
         ChatMessage(
             id=str(uuid.uuid4()),
@@ -263,6 +259,11 @@ async def _mark_failed(conversation_id: str, user_id: str, reason: str) -> None:
             metadata={"type": "error"},
         )
     ).run()
+    await Conversation.update({
+        Conversation.status: "failed",
+        Conversation.metadata: {"error": reason},
+        Conversation.updated_at: datetime.now(timezone.utc),
+    }).where(Conversation.id == conversation_id).run()
     await send_notification(
         user_id=user_id,
         title="Response Failed",
@@ -391,13 +392,6 @@ async def _orchestrate(conversation_id: str, user_id: str, agent_ids: list[str] 
             Conversation.best_score: best["best_score"],
         }).where(Conversation.id == conversation_id).run()
 
-    progress["current_best_score"] = round(best["best_score"], 2)
-    await Conversation.update({
-        Conversation.status: "completed",
-        Conversation.metadata: progress,
-        Conversation.updated_at: datetime.now(timezone.utc),
-    }).where(Conversation.id == conversation_id).run()
-
     # Store final assistant message
     await ChatMessage.insert(
         ChatMessage(
@@ -416,15 +410,8 @@ async def _orchestrate(conversation_id: str, user_id: str, agent_ids: list[str] 
         )
     ).run()
 
-    # Notify user
-    await send_notification(
-        user_id=user_id,
-        title="Response Ready",
-        body=f"\"{conversation.get('title') or 'Your conversation'}\" completed with a score of {best['best_score']:.1f}%",
-        metadata={"conversation_id": conversation_id},
-    )
-
     # Auto-generate title if user didn't provide one
+    title_text = conversation.get("title") or ""
     if turn == 1 and not is_alternative and (conversation.get("title") or "") in ("", "New Conversation"):
         from services.title_generator import generate_title
 
@@ -435,8 +422,26 @@ async def _orchestrate(conversation_id: str, user_id: str, agent_ids: list[str] 
             await Conversation.update({
                 Conversation.title: auto_title,
             }).where(Conversation.id == conversation_id).run()
+            title_text = auto_title
         except Exception:
             logger.exception("Auto title generation failed for %s", conversation_id)
+
+    # Flip the status last: clients stop polling once they see it, so the
+    # answer and the title must already be in place.
+    progress["current_best_score"] = round(best["best_score"], 2)
+    await Conversation.update({
+        Conversation.status: "completed",
+        Conversation.metadata: progress,
+        Conversation.updated_at: datetime.now(timezone.utc),
+    }).where(Conversation.id == conversation_id).run()
+
+    # Notify user
+    await send_notification(
+        user_id=user_id,
+        title="Response Ready",
+        body=f"\"{title_text or 'Your conversation'}\" completed with a score of {best['best_score']:.1f}%",
+        metadata={"conversation_id": conversation_id},
+    )
 
     return {
         "conversation_id": conversation_id,

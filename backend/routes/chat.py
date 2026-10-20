@@ -90,13 +90,15 @@ async def create_conversation(request: Request):
         )
     ).run()
 
+    generator_provider = body.generator_provider or settings.get("ai.default_provider") or "openai"
+
     # Create generator agent
     await ChatAgent.insert(
         ChatAgent(
             id=str(uuid.uuid4()),
             conversation=conv_id,
             role="generator",
-            provider=body.generator_provider,
+            provider=generator_provider,
             model=generator_model,
         )
     ).run()
@@ -107,7 +109,7 @@ async def create_conversation(request: Request):
             id=str(uuid.uuid4()),
             conversation=conv_id,
             role="evaluator",
-            provider=body.evaluator_provider or body.generator_provider,
+            provider=body.evaluator_provider or generator_provider,
             model=evaluator_model,
         )
     ).run()

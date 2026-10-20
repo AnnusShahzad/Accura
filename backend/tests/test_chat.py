@@ -189,3 +189,15 @@ async def test_status_flips_only_after_answer_and_title_exist(test_client, auth_
 
     assert conv["status"] == "completed"
     assert snapshot == {"id": snapshot["id"], "assistant_msgs": 1, "title": "Fake Title"}
+
+
+async def test_omitted_provider_uses_server_default(test_client, auth_headers, monkeypatch):
+    from config import settings as cfg
+
+    monkeypatch.setitem(cfg._data["ai"], "default_provider", "custom")
+    fake = FakeAI().install(monkeypatch)
+    _, resp = await test_client.post("/api/v1/chat", json={"prompt": "hi", "generator_model": "m"},
+                                     headers=auth_headers)
+    conv = await _wait_done(test_client, resp.json["data"]["id"], auth_headers)
+    assert {a["provider"] for a in conv["agents"]} == {"custom"}
+    assert {c["provider"] for c in fake.calls} == {"custom"}

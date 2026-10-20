@@ -17,7 +17,8 @@ class CreateConversationRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=100_000)
     # Omitted models fall back to the user's preferred models
     generator_model: Optional[str] = Field(None, min_length=1, max_length=100)
-    generator_provider: str = Field(default="openai", pattern=PROVIDER_PATTERN)
+    # Omitted providers fall back to the server's ai.default_provider
+    generator_provider: Optional[str] = Field(None, pattern=PROVIDER_PATTERN)
     evaluator_model: Optional[str] = Field(None, min_length=1, max_length=100)
     evaluator_provider: Optional[str] = Field(None, pattern=PROVIDER_PATTERN)
     search_enabled: bool = False

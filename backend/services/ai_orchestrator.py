@@ -345,7 +345,9 @@ async def _orchestrate(conversation_id: str, user_id: str, agent_ids: list[str] 
         (ChatAgent.conversation == conversation_id)
         & (ChatAgent.role == "evaluator")
     ).first().run()
-    eval_provider = evaluator_agent["provider"] if evaluator_agent else "openai"
+    eval_provider = (
+        evaluator_agent["provider"] if evaluator_agent else settings.get("ai.default_provider") or "openai"
+    )
     eval_model = evaluator_agent["model"] if evaluator_agent else settings.get("ai.default_evaluator_model", "gpt-5.1")
 
     # MCP tools are discovered once per run and shared by every agent

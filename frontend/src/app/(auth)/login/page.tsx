@@ -83,7 +83,7 @@ export default function LoginPage() {
                     <FormLabel>Password</FormLabel>
                     <Link
                       href="/forgot-password"
-                      className="text-sm text-primary hover:underline"
+                      className="-my-1 inline-block py-1 text-sm text-primary hover:underline"
                     >
                       Forgot password?
                     </Link>

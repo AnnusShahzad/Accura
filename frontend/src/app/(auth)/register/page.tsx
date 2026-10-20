@@ -171,28 +171,28 @@ function RegisterForm() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Username</FormLabel>
-                  <FormControl>
-                    <div className="relative">
+                  <div className="relative">
+                    <FormControl>
                       <Input placeholder="johndoe" {...field} />
-                      {usernameStatus.checking && (
+                    </FormControl>
+                    {usernameStatus.checking && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                      </div>
+                    )}
+                    {!usernameStatus.checking &&
+                      usernameStatus.available === true && (
                         <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                          <CheckCircle2 className="h-4 w-4 text-green-500" />
                         </div>
                       )}
-                      {!usernameStatus.checking &&
-                        usernameStatus.available === true && (
-                          <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                            <CheckCircle2 className="h-4 w-4 text-green-500" />
-                          </div>
-                        )}
-                      {!usernameStatus.checking &&
-                        usernameStatus.available === false && (
-                          <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                            <AlertCircle className="h-4 w-4 text-destructive" />
-                          </div>
-                        )}
-                    </div>
-                  </FormControl>
+                    {!usernameStatus.checking &&
+                      usernameStatus.available === false && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                          <AlertCircle className="h-4 w-4 text-destructive" />
+                        </div>
+                      )}
+                  </div>
                   {usernameStatus.available === false && (
                     <p className="text-sm text-destructive">
                       {usernameStatus.message}
@@ -232,27 +232,28 @@ function RegisterForm() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Password</FormLabel>
-                  <FormControl>
-                    <div className="relative">
+                  <div className="relative">
+                    <FormControl>
                       <Input
                         type={showPassword ? "text" : "password"}
                         placeholder="••••••••"
                         {...field}
                       />
-                      <button
-                        type="button"
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
-                        onClick={() => setShowPassword(!showPassword)}
-                        tabIndex={-1}
-                      >
-                        {showPassword ? (
-                          <EyeOff className="h-4 w-4" />
-                        ) : (
-                          <Eye className="h-4 w-4" />
-                        )}
-                      </button>
-                    </div>
-                  </FormControl>
+                    </FormControl>
+                    <button
+                      type="button"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground cursor-pointer"
+                      onClick={() => setShowPassword(!showPassword)}
+                      tabIndex={-1}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
                   {/* Password strength indicators */}
                   {password.length > 0 && (
                     <div className="mt-2 space-y-1">
@@ -290,29 +291,30 @@ function RegisterForm() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Confirm Password</FormLabel>
-                  <FormControl>
-                    <div className="relative">
+                  <div className="relative">
+                    <FormControl>
                       <Input
                         type={showConfirmPassword ? "text" : "password"}
                         placeholder="••••••••"
                         {...field}
                       />
-                      <button
-                        type="button"
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
-                        onClick={() =>
-                          setShowConfirmPassword(!showConfirmPassword)
-                        }
-                        tabIndex={-1}
-                      >
-                        {showConfirmPassword ? (
-                          <EyeOff className="h-4 w-4" />
-                        ) : (
-                          <Eye className="h-4 w-4" />
-                        )}
-                      </button>
-                    </div>
-                  </FormControl>
+                    </FormControl>
+                    <button
+                      type="button"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground cursor-pointer"
+                      onClick={() =>
+                        setShowConfirmPassword(!showConfirmPassword)
+                      }
+                      tabIndex={-1}
+                      aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                    >
+                      {showConfirmPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}

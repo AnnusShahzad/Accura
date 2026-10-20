@@ -141,7 +141,7 @@ export default function McpServersPage() {
               </Badge>
             )}
             {server.is_active ? (
-              <Badge className="bg-green-500/15 text-green-600">Active</Badge>
+              <Badge className="bg-green-500/15 text-green-700 dark:text-green-400">Active</Badge>
             ) : (
               <Badge variant="outline">Disabled</Badge>
             )}
@@ -175,7 +175,7 @@ export default function McpServersPage() {
             </Button>
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="ghost" size="icon">
+                <Button variant="ghost" size="icon" aria-label="Delete">
                   <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>
               </AlertDialogTrigger>

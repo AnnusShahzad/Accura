@@ -355,25 +355,26 @@ export default function ProfilePage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Current Password</FormLabel>
-                      <FormControl>
-                        <div className="relative">
+                      <div className="relative">
+                        <FormControl>
                           <Input
                             type={showOldPassword ? "text" : "password"}
                             {...field}
                           />
-                          <button
-                            type="button"
-                            className="absolute right-3 top-1/2 -translate-y-1/2"
-                            onClick={() => setShowOldPassword(!showOldPassword)}
-                          >
-                            {showOldPassword ? (
-                              <EyeOff className="h-4 w-4" />
-                            ) : (
-                              <Eye className="h-4 w-4" />
-                            )}
-                          </button>
-                        </div>
-                      </FormControl>
+                        </FormControl>
+                        <button
+                          type="button"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1"
+                          onClick={() => setShowOldPassword(!showOldPassword)}
+                          aria-label={showOldPassword ? "Hide password" : "Show password"}
+                        >
+                          {showOldPassword ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -385,25 +386,26 @@ export default function ProfilePage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>New Password</FormLabel>
-                      <FormControl>
-                        <div className="relative">
+                      <div className="relative">
+                        <FormControl>
                           <Input
                             type={showNewPassword ? "text" : "password"}
                             {...field}
                           />
-                          <button
-                            type="button"
-                            className="absolute right-3 top-1/2 -translate-y-1/2"
-                            onClick={() => setShowNewPassword(!showNewPassword)}
-                          >
-                            {showNewPassword ? (
-                              <EyeOff className="h-4 w-4" />
-                            ) : (
-                              <Eye className="h-4 w-4" />
-                            )}
-                          </button>
-                        </div>
-                      </FormControl>
+                        </FormControl>
+                        <button
+                          type="button"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1"
+                          onClick={() => setShowNewPassword(!showNewPassword)}
+                          aria-label={showNewPassword ? "Hide password" : "Show password"}
+                        >
+                          {showNewPassword ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
 
                       {newPassword.length > 0 && (
                         <div className="mt-2 space-y-1">
@@ -443,27 +445,28 @@ export default function ProfilePage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Confirm New Password</FormLabel>
-                      <FormControl>
-                        <div className="relative">
+                      <div className="relative">
+                        <FormControl>
                           <Input
                             type={showConfirmPassword ? "text" : "password"}
                             {...field}
                           />
-                          <button
-                            type="button"
-                            className="absolute right-3 top-1/2 -translate-y-1/2"
-                            onClick={() =>
-                              setShowConfirmPassword(!showConfirmPassword)
-                            }
-                          >
-                            {showConfirmPassword ? (
-                              <EyeOff className="h-4 w-4" />
-                            ) : (
-                              <Eye className="h-4 w-4" />
-                            )}
-                          </button>
-                        </div>
-                      </FormControl>
+                        </FormControl>
+                        <button
+                          type="button"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1"
+                          onClick={() =>
+                            setShowConfirmPassword(!showConfirmPassword)
+                          }
+                          aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                        >
+                          {showConfirmPassword ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}

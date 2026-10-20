@@ -112,6 +112,7 @@ export default function AdminPlansPage() {
                     variant="ghost"
                     size="icon"
                     onClick={() => setEditingPlan(plan)}
+                    aria-label="Edit"
                   >
                     <Pencil className="h-4 w-4" />
                   </Button>

@@ -309,24 +309,30 @@ export default function NewChatPage() {
           {/* Advanced Settings */}
           <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
             <Card>
-              <CollapsibleTrigger asChild>
-                <CardHeader className="cursor-pointer">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Settings2 className="h-5 w-5" />
-                      <CardTitle>Advanced Settings</CardTitle>
-                    </div>
-                    <ChevronDown
-                      className={`h-5 w-5 transition-transform ${
-                        showAdvanced ? "rotate-180" : ""
-                      }`}
-                    />
-                  </div>
-                  <CardDescription>
-                    Override global settings for this conversation
-                  </CardDescription>
-                </CardHeader>
-              </CollapsibleTrigger>
+              <CardHeader>
+                {/* A real button, so the section opens from the keyboard too */}
+                <CollapsibleTrigger asChild>
+                  <button
+                    type="button"
+                    className="w-full cursor-pointer rounded-md text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  >
+                    <span className="flex items-center justify-between gap-2">
+                      <span className="flex items-center gap-2">
+                        <Settings2 className="h-5 w-5" />
+                        <span className="font-semibold leading-none">Advanced Settings</span>
+                      </span>
+                      <ChevronDown
+                        className={`h-5 w-5 shrink-0 transition-transform ${
+                          showAdvanced ? "rotate-180" : ""
+                        }`}
+                      />
+                    </span>
+                    <span className="mt-1.5 block text-sm text-muted-foreground">
+                      Override global settings for this conversation
+                    </span>
+                  </button>
+                </CollapsibleTrigger>
+              </CardHeader>
               <CollapsibleContent>
                 <CardContent className="space-y-6">
                   <Separator />
@@ -342,6 +348,7 @@ export default function NewChatPage() {
                         </div>
                         <FormControl>
                           <Slider
+                            aria-label="Evaluation threshold"
                             min={0}
                             max={100}
                             step={1}

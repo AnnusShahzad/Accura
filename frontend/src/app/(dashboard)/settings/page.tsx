@@ -119,6 +119,7 @@ export default function SettingsPage() {
                     </div>
                     <FormControl>
                       <Slider
+                        aria-label="Evaluation threshold"
                         min={0}
                         max={100}
                         step={1}

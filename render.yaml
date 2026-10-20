@@ -1,10 +1,10 @@
 # =============================================================================
-# Accura – Render Blueprint (free tier)
+# Accura – Render Blueprint (free tier, everything on Render)
 #
 # Dashboard → New → Blueprint → pick this repository. Render creates:
-#   * accura-api  – the Sanic backend (Python web service)
-#   * accura-db   – PostgreSQL (free plan)
-#   * accura-web  – the Next.js frontend (optional: or deploy it on Vercel)
+#   * accura     – ONE web service running the frontend and the API together
+#                  (see Dockerfile): one URL, nothing to wire up between them
+#   * accura-db  – PostgreSQL (free plan)
 #
 # Values marked `sync: false` are asked for when the Blueprint is created.
 # See DEPLOYMENT.md for the full walkthrough.
@@ -18,16 +18,14 @@ databases:
 
 services:
   - type: web
-    name: accura-api
-    runtime: python
+    name: accura
+    runtime: docker
     plan: free
-    rootDir: backend
-    buildCommand: pip install -r requirements.txt
-    startCommand: python app.py
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    # Goes through the web server to the API, so it checks both halves
     healthCheckPath: /api/v1/health
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.12.8
       - key: APP_ENV
         value: production
       - key: APP_DEBUG
@@ -59,26 +57,8 @@ services:
       - key: ADMIN_PASSWORD
         sync: false
       # At least one AI provider. For a single OpenAI-compatible endpoint
-      # (OpenRouter, Groq, Together, ...) set CUSTOM_AI_* and
-      # DEFAULT_AI_PROVIDER=custom plus DEFAULT_*_MODEL instead.
+      # (OpenRouter, Groq, Together, ...) leave this empty and add
+      # CUSTOM_AI_* and DEFAULT_AI_PROVIDER=custom plus DEFAULT_*_MODEL
+      # in the service's Environment tab instead.
       - key: OPENAI_API_KEY
-        sync: false
-      # The frontend's public URL, used in emailed links
-      - key: APP_FRONTEND_URL
-        sync: false
-
-  - type: web
-    name: accura-web
-    runtime: node
-    plan: free
-    # --include=dev: the build needs Tailwind/PostCSS/TypeScript, which npm
-    # skips when NODE_ENV=production is set on the service
-    buildCommand: npm ci --include=dev && npm run build --workspace frontend
-    startCommand: npm run start --workspace frontend
-    envVars:
-      - key: NODE_VERSION
-        value: "22"
-      # The API's public URL + /api/v1, e.g.
-      # https://accura-api.onrender.com/api/v1 (read at build time)
-      - key: NEXT_PUBLIC_API_URL
         sync: false

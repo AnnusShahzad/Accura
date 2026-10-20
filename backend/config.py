@@ -55,6 +55,8 @@ def _env_overrides() -> dict:
         # Platform conventions (Render, Railway, Fly, Heroku-style hosts)
         ("PORT", "app.port", int),
         ("DATABASE_URL", "database.url", str),
+        # Render: the service's public URL (frontend and API share it there)
+        ("RENDER_EXTERNAL_URL", "app.frontend_url", str),
         ("APP_ENV", "app.environment", str),
         ("APP_HOST", "app.host", str),
         ("APP_PORT", "app.port", int),

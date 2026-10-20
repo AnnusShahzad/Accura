@@ -36,10 +36,14 @@ export default function DashboardLayout({
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset>
+      {/* One viewport-tall column: header, optional banner, then the only
+          scrolling region. Pages that need the full remaining height (chat)
+          can use h-full instead of guessing at 100vh minus the header. */}
+      <SidebarInset className="h-svh overflow-hidden">
         <Header />
         <GuestBanner />
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6">{children}</main>
+        {/* SidebarInset already renders <main>; a second one is invalid */}
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-6">{children}</div>
       </SidebarInset>
     </SidebarProvider>
   );

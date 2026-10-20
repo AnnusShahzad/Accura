@@ -13,7 +13,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Bell,
   CheckCheck,
@@ -109,7 +108,7 @@ export default function NotificationsPage() {
           </CardContent>
         </Card>
       ) : (
-        <ScrollArea className="h-[calc(100vh-220px)]">
+        <div>
           <div className="space-y-2">
             {notifications.map((notification) => (
               <Card
@@ -163,7 +162,7 @@ export default function NotificationsPage() {
               </Card>
             ))}
           </div>
-        </ScrollArea>
+        </div>
       )}
     </div>
   );

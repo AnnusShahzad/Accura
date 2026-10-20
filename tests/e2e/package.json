@@ -1,0 +1,15 @@
+{
+  "name": "accura-e2e",
+  "private": true,
+  "description": "Browser end-to-end checks for Accura (not part of the app workspaces)",
+  "type": "module",
+  "scripts": {
+    "full": "node full.mjs",
+    "demo": "node demo.mjs",
+    "audit": "node audit.mjs"
+  },
+  "dependencies": {
+    "axe-core": "4.10.2",
+    "playwright": "1.49.1"
+  }
+}

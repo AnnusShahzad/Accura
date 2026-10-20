@@ -327,10 +327,6 @@ function BillingContent() {
                         <span className="text-muted-foreground">{feature}</span>
                       </li>
                     ))}
-                    <li className="flex items-center gap-2">
-                      <Check className="h-4 w-4 text-primary shrink-0" />
-                      <span className="text-muted-foreground">{plan.requests_per_day} requests / day</span>
-                    </li>
                   </ul>
                 </CardContent>
                 <CardFooter>

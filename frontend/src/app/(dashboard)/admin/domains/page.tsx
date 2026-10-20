@@ -119,7 +119,7 @@ export default function AdminDomainsPage() {
         <div>
           <h1 className="text-2xl font-bold">Domain Rules</h1>
           <p className="text-muted-foreground">
-            Manage allowed and blocked email domains for registration
+            Choose which websites web search may use as sources (subdomains included)
           </p>
         </div>
         <Button onClick={openCreate}>
@@ -140,7 +140,7 @@ export default function AdminDomainsPage() {
             <Shield className="mx-auto h-12 w-12 text-muted-foreground" />
             <CardTitle className="mt-4">No Domain Rules</CardTitle>
             <CardDescription className="mt-2">
-              All email domains are currently allowed
+              Web search can currently use results from any site
             </CardDescription>
           </CardContent>
         </Card>
@@ -165,12 +165,13 @@ export default function AdminDomainsPage() {
                     variant="ghost"
                     size="icon"
                     onClick={() => openEdit(rule)}
+                    aria-label="Edit"
                   >
                     <Pencil className="h-4 w-4" />
                   </Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button variant="ghost" size="icon">
+                      <Button variant="ghost" size="icon" aria-label="Delete">
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </AlertDialogTrigger>
@@ -243,8 +244,8 @@ export default function AdminDomainsPage() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="whitelist">Whitelist</SelectItem>
-                        <SelectItem value="blacklist">Blacklist</SelectItem>
+                        <SelectItem value="whitelist">Whitelist – only use these sites</SelectItem>
+                        <SelectItem value="blacklist">Blacklist – never use these sites</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />

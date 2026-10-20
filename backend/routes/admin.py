@@ -113,7 +113,8 @@ async def list_users(request: Request):
 
     query = User.select(
         User.id, User.email, User.username, User.tier,
-        User.is_active, User.is_verified, User.is_admin, User.created_at,
+        User.is_active, User.is_verified, User.is_admin, User.is_guest, User.expires_at,
+        User.created_at,
     )
     count = User.count()
     if search:

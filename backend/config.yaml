@@ -53,10 +53,33 @@ smtp:
   from_email: "noreply@example.com"
   use_tls: true
 
+auth:
+  # Self-service sign-up. Turn off for public demos; admins and guests
+  # can still log in.
+  registration_enabled: true
+  guest:
+    # One-click throwaway accounts. Everything a guest creates is deleted
+    # ttl_hours after the guest account was created.
+    enabled: false
+    ttl_hours: 24
+    # Guests use the platform's AI keys, so keep them on a short leash
+    requests_per_minute: 5
+    requests_per_day: 30
+    max_iterations: 3
+  # Created (or promoted) on startup when both are set. Useful on hosts
+  # without shell access, e.g. Render's free tier.
+  bootstrap_admin:
+    email: ""
+    password: ""
+    username: ""
+
 ai:
+  # Provider used when a request or a stored preference doesn't name one
+  default_provider: "openai"
   default_generator_model: "gpt-5.2"
   default_evaluator_model: "gpt-5.1"
-  default_reprompt_model: "gpt-5.1"
+  # Empty = rephrase with the conversation's evaluator model
+  default_reprompt_model: ""
   providers:
     openai:
       api_key: ""
@@ -139,8 +162,13 @@ subscriptions:
       - "SSO integration"
 
 security:
-  # Fernet key used to encrypt BYOK API keys at rest. REQUIRED.
+  # Secret used to encrypt BYOK API keys at rest. REQUIRED. A Fernet key
+  # is used as-is; any other string is turned into one with SHA-256.
   encryption_key: ""
+  # Allow MCP servers, custom AI endpoints and webhooks to point at
+  # private/loopback addresses. Keep false on any public deployment, or
+  # users can make the server fetch internal URLs.
+  allow_private_urls: true
 
 billing:
   # When stripe_secret_key is empty the platform runs in demo billing mode:

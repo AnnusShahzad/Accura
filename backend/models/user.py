@@ -25,6 +25,9 @@ class User(Table, tablename="users"):
     is_verified = Boolean(default=False)
     is_admin = Boolean(default=False)
     tier = Varchar(length=20, default="basic")  # basic | pro | business
+    # Guest accounts are throwaway: everything they own is purged at expires_at
+    is_guest = Boolean(default=False, index=True)
+    expires_at = Timestamptz(null=True, default=None)
     otp_code = Varchar(length=6, default="")
     otp_expires_at = Timestamptz(null=True, default=None)
     created_at = Timestamptz(default=TimestamptzNow())

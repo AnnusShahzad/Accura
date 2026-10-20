@@ -58,6 +58,9 @@ async def subscribe(request: Request):
     user = request.ctx.user
     user_id = str(user["id"])
 
+    if user.get("is_guest"):
+        return error("Guest accounts can't change plans. Sign in with a full account to upgrade.", status=403)
+
     # Business tier requires contact
     if body.plan_name == "business":
         return error(
@@ -98,6 +101,8 @@ async def subscribe(request: Request):
 @require_auth
 async def cancel(request: Request):
     user_id = str(request.ctx.user["id"])
+    if request.ctx.user.get("is_guest"):
+        return error("Guest accounts don't have a plan to cancel.", status=403)
 
     try:
         await cancel_subscription(user_id)

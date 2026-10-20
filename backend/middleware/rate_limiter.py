@@ -132,7 +132,12 @@ async def rate_limit_middleware(request: Request):
         return
 
     user_id = str(user["id"])
-    rpm_limit, rpd_limit = await _get_limits(user.get("tier", "basic"))
+    if user.get("is_guest"):
+        # Guests spend the platform's AI keys; they get their own budget
+        rpm_limit = int(settings.get("auth.guest.requests_per_minute", 5))
+        rpd_limit = int(settings.get("auth.guest.requests_per_day", 30))
+    else:
+        rpm_limit, rpd_limit = await _get_limits(user.get("tier", "basic"))
     now = time.time()
 
     client = _get_redis()

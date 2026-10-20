@@ -12,9 +12,13 @@ POST /api/v1/auth/forgot-password
 POST /api/v1/auth/reset-password
 POST /api/v1/auth/request-email-change
 POST /api/v1/auth/verify-email-change
+POST /api/v1/auth/guest
 """
 
 from __future__ import annotations
+
+import time
+from collections import defaultdict, deque
 
 from sanic import Blueprint, Request
 
@@ -36,6 +40,7 @@ from services.auth_service import (
     change_password,
     check_username_available,
     confirm_email_change,
+    create_guest,
     login_user,
     refresh_tokens,
     register_user,
@@ -46,7 +51,7 @@ from services.auth_service import (
     verify_email,
     verify_otp,
 )
-from utils.exceptions import AuthenticationError, ValidationError
+from utils.exceptions import AuthenticationError, AuthorizationError, ValidationError
 from utils.responses import error, success, validation_error
 
 bp = Blueprint("auth", url_prefix="/api/v1/auth")
@@ -67,7 +72,7 @@ async def register(request: Request):
             first_name=body.first_name,
             last_name=body.last_name,
         )
-    except ValidationError as exc:
+    except (ValidationError, AuthorizationError) as exc:
         return error(exc.message, status=exc.status_code)
 
     if user.get("already_exists_unverified"):
@@ -196,7 +201,7 @@ async def change_pwd(request: Request):
             old_password=body.old_password,
             new_password=body.new_password,
         )
-    except (AuthenticationError, ValidationError) as exc:
+    except (AuthenticationError, AuthorizationError, ValidationError) as exc:
         return error(exc.message, status=exc.status_code)
 
     return success(message="Password changed")
@@ -214,7 +219,7 @@ async def request_email_change_route(request: Request):
             user_id=str(request.ctx.user["id"]),
             new_email=body.email,
         )
-    except (AuthenticationError, ValidationError) as exc:
+    except (AuthenticationError, AuthorizationError, ValidationError) as exc:
         return error(exc.message, status=exc.status_code)
 
     return success(message="Verification email sent")
@@ -233,3 +238,40 @@ async def verify_email_change_route(request: Request):
         return error(exc.message, status=exc.status_code)
 
     return success({"email": new_email}, message="Email updated")
+
+
+
+# Guest sign-ins per client IP, to stop scripts minting accounts that all
+# spend the platform's AI budget.
+_GUEST_WINDOW_SECONDS = 3600
+_GUESTS_PER_WINDOW = 5
+_guest_signins: dict[str, deque] = defaultdict(deque)
+
+
+def _client_ip(request: Request) -> str:
+    # Render, Vercel, Fly etc. put the real client first in X-Forwarded-For
+    forwarded = request.headers.get("X-Forwarded-For", "")
+    return forwarded.split(",")[0].strip() or request.ip or "unknown"
+
+
+@bp.post("/guest")
+async def guest_login(request: Request):
+    ip = _client_ip(request)
+    now = time.monotonic()
+    recent = _guest_signins[ip]
+    while recent and now - recent[0] > _GUEST_WINDOW_SECONDS:
+        recent.popleft()
+    if len(recent) >= _GUESTS_PER_WINDOW:
+        return error(
+            "Too many guest sessions from your network. Please try again later.",
+            status=429,
+            retry_after_seconds=_GUEST_WINDOW_SECONDS,
+        )
+
+    try:
+        tokens = await create_guest()
+    except AuthorizationError as exc:
+        return error(exc.message, status=exc.status_code)
+
+    recent.append(now)
+    return success(tokens, message="Guest session started", status=201)

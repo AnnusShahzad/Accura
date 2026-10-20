@@ -54,6 +54,15 @@ async def _resolve_settings(user_id: str, conversation: dict) -> dict:
     if conversation.get("timeout_seconds") is not None:
         defaults["timeout_seconds"] = int(conversation["timeout_seconds"])
 
+    # Guests can't buy their way past the cap via settings or overrides
+    from models.user import User
+
+    owner = await User.select(User.is_guest).where(User.id == user_id).first().run()
+    if owner and owner["is_guest"]:
+        cap = int(settings.get("auth.guest.max_iterations", 3))
+        defaults["max_iterations"] = max(1, min(defaults["max_iterations"], cap))
+        defaults["timeout_seconds"] = min(defaults["timeout_seconds"], 120)
+
     return defaults
 
 

@@ -17,7 +17,7 @@ import _bootstrap  # noqa: F401
 
 from models.settings import UserSettings
 from models.user import User, UserProfile
-from services.auth_service import hash_password, validate_password
+from services.auth_service import hash_password, new_user_settings, validate_password
 from utils.db_schema import ensure_schema
 from utils.exceptions import ValidationError
 
@@ -47,7 +47,7 @@ async def main(email: str, username: str | None, password: str | None) -> None:
         is_verified=True,
     )).run()
     await UserProfile.insert(UserProfile(id=str(uuid.uuid4()), user=user_id)).run()
-    await UserSettings.insert(UserSettings(id=str(uuid.uuid4()), user=user_id)).run()
+    await UserSettings.insert(new_user_settings(user_id)).run()
     print(f"Created admin {email}.")
 
 

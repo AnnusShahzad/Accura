@@ -178,8 +178,11 @@ billing:
   stripe_price_ids:
     pro_monthly: ""
     pro_yearly: ""
-  # How often (seconds) the renewal job checks for expired periods
-  renewal_check_interval: 3600
+
+maintenance:
+  # How often (seconds) to purge expired guests and temporary chats,
+  # recover stuck runs and renew demo subscriptions
+  interval_seconds: 300
 
 search:
   enabled: true

@@ -37,336 +37,196 @@ Measured over 400+ test prompts, against single-pass answers from GPT-OSS 120B /
 
 Accura implements a generate-evaluate-refine loop for AI responses:
 
-1. **Generate** – Creates responses using configurable AI models with optional web search and MCP tool integration
-2. **Evaluate** – Scores responses against quality criteria
-3. **Refine** – Rephrases prompts and regenerates until threshold is met or iteration limit reached
+1. **Generate** – A generator model answers the prompt, optionally with Google web search results and tools from connected MCP servers, and with the earlier turns of the conversation as context.
+2. **Evaluate** – An evaluator model scores the answer from 0–100 against the prompt.
+3. **Refine** – Below the threshold, a rephrased prompt is generated from the evaluator's feedback and the loop runs again, until the threshold or the iteration limit is reached.
 
-The system supports multiple generator agents per conversation, tier-based rate limiting, and subscription management.
+Several generator agents can work on the same conversation (the best answer wins), and more can be added mid-chat to produce alternatives.
 
 ## Tech Stack
 
-**Backend**
-- Sanic (async web framework)
-- Piccolo ORM (PostgreSQL)
-- JWT authentication with bcrypt
-- Redis for rate limiting
-- SMTP email with Jinja2 templates
+**Backend** – Sanic, Piccolo ORM (SQLite for development, PostgreSQL for production), JWT auth with bcrypt, OpenAI-compatible client for every provider, optional Redis for rate limiting, SMTP email with Jinja2 templates.
 
-**Frontend**
-- Next.js 16 (App Router)
-- React 19
-- shadcn/ui components
-- TanStack Query
-- Zustand for state management
+**Frontend** – Next.js 16 (App Router), React 19, shadcn/ui, TanStack Query, Zustand.
 
 ## Project Structure
 
 ```
 accura/
 ├── backend/
-│   ├── models/          # Database tables (User, Subscription, Conversation, etc.)
+│   ├── models/          # Database tables (User, Subscription, Conversation, ...)
 │   ├── routes/          # API endpoints grouped by feature
-│   ├── services/        # Business logic (orchestrator, generator, evaluator)
+│   ├── services/        # Orchestrator, generator, evaluator, MCP client, billing ...
 │   ├── middleware/      # Auth, rate limiting
-│   ├── schemas/         # Pydantic validation
-│   └── utils/           # Email, crypto, webhooks
-│
-└── frontend/
-    ├── src/app/         # Next.js routes (auth, dashboard, chat)
-    ├── components/      # React components
-    ├── hooks/           # Custom React hooks
-    └── stores/          # Zustand stores
+│   ├── schemas/         # Pydantic request validation
+│   ├── utils/           # Email, crypto, webhooks, schema bootstrap
+│   ├── scripts/         # create_admin, delete_user, test_smtp, smoke_test
+│   └── tests/           # pytest suite
+├── frontend/
+│   └── src/             # app/ (routes), components/, hooks/, lib/, stores/, types/
+└── scripts/             # Cross-platform helpers used by the root npm scripts
 ```
 
-## Monorepo Commands (Root)
+## Quick Start (local development)
 
-The repository now supports running backend and frontend from the root as a single workspace.
-
-### Prerequisites
-
-- Python 3.11+
-- Node.js 20+
-- Docker (optional, for Postgres + Redis)
-
-### 1. Install Dependencies
-
-From the repository root:
+Prerequisites: Python 3.11+, Node.js 20+. Docker is optional.
 
 ```bash
-npm install
-```
+npm install                 # frontend + root tooling
+npm run setup:backend       # creates backend/.venv and installs requirements
 
-Then install backend Python dependencies (use your active virtual environment):
-
-```bash
-npm run setup:backend
-```
-
-Or run both setup steps:
-
-```bash
-npm run setup
-```
-
-### 2. Start Local Infra (Optional)
-
-```bash
-npm run dev:infra
-```
-
-This starts PostgreSQL + Redis from `backend/docker-compose.yml`.
-
-### 3. Run Both Apps With One Command
-
-```bash
-npm run dev
-```
-
-This launches:
-- Backend: `http://localhost:8000`
-- Frontend: `http://localhost:3000`
-
-### 4. Other Root Scripts
-
-- `npm run dev:backend` – run only backend
-- `npm run dev:frontend` – run only frontend
-- `npm run build` – build frontend
-- `npm run lint` – lint frontend
-- `npm run stop:infra` – stop infra services
-
-## Setup
-
-### Prerequisites
-
-- Docker and Docker Compose (recommended)
-- Or: Python 3.11+, Node.js 20+, PostgreSQL 15+, Redis
-
-### Quick Start with Docker
-
-1. Clone and configure:
-```bash
-git clone <repository-url>
-cd accura
 cp backend/.env.example backend/.env
-cp frontend/.env.example frontend/.env
+cp frontend/.env.example frontend/.env.local
 ```
 
-2. Edit `backend/.env` with your credentials:
-```env
-APP_SECRET_KEY=<generate-with-openssl-rand-hex-32>
-DB_PASSWORD=<secure-password>
-SMTP_HOST=smtp.example.com
-SMTP_PORT=587
-SMTP_USERNAME=<your-email>
-SMTP_PASSWORD=<your-password>
-DEFAULT_AI_MODEL=gpt-4o
-DEFAULT_AI_API_KEY=<your-openai-key>
-```
-
-3. Start services:
-```bash
-cd backend
-docker compose up -d
-```
-
-This starts PostgreSQL, Redis, runs migrations, and launches the API at `http://localhost:8000`.
-
-4. Start frontend:
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Frontend runs at `http://localhost:3000`.
-
-### Manual Setup
-
-**Backend:**
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-
-# Configure database in config.yaml or .env
-piccolo migrations forward
-python app.py
-```
-
-**Frontend:**
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-## Configuration
-
-Configuration uses a layered approach:
-
-1. `backend/config.yaml` – defaults for self-hosted deployments
-2. Environment variables – override YAML values
-3. Database settings – per-user and per-conversation overrides
-
-Key environment variables:
+Edit `backend/.env` and set at least:
 
 ```env
-# App
-APP_ENV=production
-APP_HOST=0.0.0.0
-APP_PORT=8000
-APP_SECRET_KEY=<required>
-APP_FRONTEND_URL=http://localhost:3000
-
-# Database
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=accura
-DB_USER=accura
-DB_PASSWORD=<required>
-
-# AI (defaults, users can BYOK)
-DEFAULT_AI_PROVIDER=openai
-DEFAULT_AI_MODEL=gpt-4o
-DEFAULT_AI_API_KEY=<required>
-
-# Email
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USERNAME=<required>
-SMTP_PASSWORD=<required>
-SMTP_FROM_EMAIL=noreply@example.com
-
-# Optional: Search
-GOOGLE_CUSTOM_SEARCH_API_KEY=<key>
-GOOGLE_CUSTOM_SEARCH_ENGINE_ID=<id>
-
-# Optional: Webhooks
-SLACK_WEBHOOK_URL=<url>
+JWT_SECRET=<output of: openssl rand -hex 32>
+ENCRYPTION_KEY=<output of: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())">
+OPENAI_API_KEY=<platform key>   # optional: users can also bring their own keys
 ```
 
-## API Overview
+The default database is a local SQLite file, so nothing else is required. Then:
 
-All endpoints are under `/api/v1/`:
+```bash
+npm run dev                 # backend on :8000, frontend on :3000
+```
 
-- **auth** – register, login, verify email, OTP, password reset
-- **user** – profile management
-- **chat** – conversations, messages, streaming responses
-- **settings** – quality thresholds, models, notification preferences
-- **api-keys** – BYOK key management (encrypted)
-- **mcp-servers** – MCP server configuration and tool access
-- **billing** – subscriptions, transactions, Stripe webhooks
-- **notifications** – push notifications
-- **admin** – system prompts, domain rules, analytics
-
-Authentication uses Bearer tokens. Protected routes require `Authorization: Bearer <token>`.
-
-## Features
-
-### AI Orchestration
-
-- Iterative generate-evaluate-refine loop with configurable quality thresholds
-- Multiple generator agents per conversation
-- Token usage tracking across iterations
-- Timeout protection with graceful degradation
-
-### Bring Your Own Key (BYOK)
-
-Users can provide their own API keys for:
-- OpenAI
-- Anthropic
-- Google AI
-- Custom OpenAI-compatible endpoints
-
-Keys are encrypted at rest using Fernet symmetric encryption.
-
-### MCP Integration
-
-Connect external tools via Model Context Protocol servers:
-- User-configured MCP servers
-- Automatic tool discovery
-- Request/response logging
-- Error handling with fallbacks
-
-### Subscription System
-
-- Tiered plans with feature gates (search, MCP, max iterations)
-- Stripe integration for payments
-- Recurring billing with APScheduler
-- Transaction history and invoice management
-
-### Web Search
-
-- Google Custom Search integration
-- Domain-specific filtering rules
-- Automatic relevance pruning
-- Search result caching
-
-## Development
-
-### Running Tests
+Create the first administrator (registration requires an emailed OTP, and admin rights can only be granted by an admin):
 
 ```bash
 cd backend
-pytest tests/
+.venv/bin/python scripts/create_admin.py you@example.com --password 'S3cure!Pass'
 ```
 
-Tests cover:
-- Authentication flows
-- Chat orchestration
-- Settings management
-- E2E API interactions
+Without SMTP configured, verification codes and reset links are printed to the backend log when `APP_DEBUG=true`.
 
-### Database Migrations
+### Root scripts
+
+| Script | What it does |
+|:--|:--|
+| `npm run dev` | Backend and frontend together |
+| `npm run dev:backend` / `dev:frontend` | One side only |
+| `npm run setup` | Install frontend deps and create the backend virtualenv |
+| `npm run build` | Production build of the frontend |
+| `npm run lint` | Lint the frontend |
+| `npm test` | Backend test suite |
+| `npm run dev:infra` / `stop:infra` | Start / stop PostgreSQL and Redis in Docker |
+
+## Docker (self-hosted)
 
 ```bash
-# Create migration
-piccolo migrations new
-
-# Apply migrations
-piccolo migrations forward
-
-# Rollback
-piccolo migrations backward
+cd backend
+cp .env.example .env        # set JWT_SECRET, ENCRYPTION_KEY, DB_PASSWORD, SMTP_*, keys
+docker compose up -d        # PostgreSQL + Redis + backend on :8000
+docker compose exec backend python scripts/create_admin.py you@example.com
 ```
 
-### Utilities
-
-- **fix_db.py** – repair database inconsistencies
-- **delete_user.py** – GDPR-compliant user deletion
-- **test_smtp.py** – verify email configuration
-
-## Deployment
-
-### Docker Production
+For production, add the override that stops publishing the database and Redis ports and runs the code baked into the image:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 ```
 
-### Environment Checklist
+The frontend is a standard Next.js app: `npm run build && npm run start` in `frontend/` (set `NEXT_PUBLIC_API_URL` at build time).
 
-- [ ] Set strong `APP_SECRET_KEY`
-- [ ] Configure production database with connection pooling
-- [ ] Set up Redis for rate limiting
-- [ ] Configure SMTP for transactional emails
-- [ ] Add Stripe webhook endpoint with signature verification
-- [ ] Set `APP_ENV=production` and `APP_DEBUG=false`
-- [ ] Configure CORS for your frontend domain
-- [ ] Set up SSL/TLS termination (nginx/Caddy)
-- [ ] Enable database backups
-- [ ] Configure logging and monitoring
+With `APP_ENV=production` the backend refuses to start if `JWT_SECRET` is a placeholder or `ENCRYPTION_KEY` is missing.
+
+## Configuration
+
+Settings are layered, later layers winning:
+
+1. `backend/config.yaml` – defaults
+2. Environment variables / `backend/.env` – see `backend/.env.example` for every supported variable
+3. **Admin → Configuration** – runtime overrides keyed by dotted config path (e.g. `evaluation.global_threshold`), applied immediately without a restart
+4. Per-user settings and per-conversation overrides for threshold, iterations and timeout
+
+Most important variables:
+
+| Variable | Purpose |
+|:--|:--|
+| `DB_ENGINE` | `sqlite` (default) or `postgres`; `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` for Postgres |
+| `JWT_SECRET`, `ENCRYPTION_KEY` | Token signing and at-rest encryption of stored API keys (required) |
+| `OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_AI_API_KEY` | Platform keys per provider |
+| `CUSTOM_AI_API_KEY`, `CUSTOM_AI_BASE_URL`, `OPENAI_BASE_URL` | Any OpenAI-compatible endpoint (vLLM, Ollama, OpenRouter, NVIDIA NIM, ...) |
+| `DEFAULT_GENERATOR_MODEL`, `DEFAULT_EVALUATOR_MODEL`, `DEFAULT_REPROMPT_MODEL` | Models used when none is chosen |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL` | OTP codes, password reset, email notifications |
+| `GOOGLE_API_KEY`, `GOOGLE_CSE_ID` | Web search (search is skipped when unset) |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO_MONTHLY`, `STRIPE_PRICE_PRO_YEARLY` | Real payments; leave empty for demo billing |
+| `REDIS_URL` | Shared rate limiting across workers (in-memory when unset) |
+| `APP_CORS_ORIGINS` | Comma-separated allowed origins |
+
+## Features
+
+### AI orchestration
+- Generate → evaluate → rephrase loop with configurable threshold, iteration limit and per-agent timeout
+- Multiple generator agents in parallel; agents can be added mid-chat for alternative answers
+- Follow-up messages carry the conversation history to both generator and evaluator
+- Failed runs (missing key, provider error, timeout) are reported in the chat with a Retry button
+- Token usage recorded per iteration and per conversation; conversations are auto-titled
+
+### Providers and BYOK
+OpenAI, DeepSeek, Anthropic and Google AI (through their OpenAI-compatible endpoints) plus any custom OpenAI-compatible endpoint. Users can store their own keys, encrypted at rest with Fernet; a user's key takes precedence over the platform key for that provider.
+
+### MCP tools
+Users on Pro/Business, and admins for everyone, can connect MCP servers over **Streamable HTTP** or legacy **SSE**. Tools are discovered at the start of each run and offered to the model as function calls; unreachable servers are skipped. ("stdio" servers cannot be reached by a hosted backend.)
+
+### Subscriptions and billing
+- Basic / Pro / Business plans with per-plan rate limits, editable by admins
+- **Stripe mode** (`STRIPE_SECRET_KEY` set): upgrades go through Stripe Checkout; the signed webhook at `/api/v1/billing/webhook` activates, renews, marks past-due and cancels subscriptions
+- **Demo mode** (no Stripe key): upgrades apply instantly, transactions are marked "demo, not charged", and a background job rolls billing periods over
+- Business plans go through the contact form
+
+### Web search
+Google Programmable Search with admin-managed domain whitelist/blacklist (subdomains included); results are restricted to recent months when the prompt asks for current information.
+
+### Notifications
+In-app, email, Slack and Teams (incoming webhooks), per user.
+
+## API Overview
+
+All endpoints are under `/api/v1/`, authenticated with `Authorization: Bearer <access token>` unless public. Interactive docs are served at `/docs` by the backend.
+
+- **auth** – register, OTP verification, login, refresh, password reset, email change
+- **user** – profile
+- **chat** – conversations, follow-up messages, extra agents, retry, iterations, tokens
+- **settings** – thresholds, preferred models, notification channels
+- **api-keys** – BYOK key management
+- **mcp-servers** – MCP server configuration and connection test
+- **billing** – plans (public), subscribe, cancel, subscription, transactions, token usage, Stripe webhook
+- **notifications** – list, unread count, mark read, delete
+- **contact** – public contact form
+- **admin** – dashboard, users, plans, system prompts, domain rules, global MCP servers, configuration overrides, contact requests
+
+## Development
+
+### Tests
+
+```bash
+npm test                                   # or: cd backend && .venv/bin/python -m pytest
+```
+
+The suite uses a throwaway SQLite database and fake AI/MCP/HTTP backends, so it needs no network or keys. To run it against PostgreSQL:
+
+```bash
+TEST_DB_ENGINE=postgres DB_HOST=localhost DB_PORT=5432 DB_NAME=accura_test \
+  DB_USER=accura DB_PASSWORD=... npm test
+```
+
+`backend/scripts/smoke_test.py` exercises a running server over HTTP.
+
+### Database schema
+
+Tables are created on startup and columns added since a database was first created are back-filled automatically (`backend/utils/db_schema.py`), for both SQLite and PostgreSQL. No manual migration step is needed for additive changes.
+
+### Utilities (`backend/scripts/`)
+
+- `create_admin.py` – create an admin or promote an existing user
+- `delete_user.py` – permanently delete a user and everything they own
+- `test_smtp.py` – send a test email with the configured SMTP settings
+- `smoke_test.py` – HTTP smoke test against a running backend
 
 ## License
 
 See [LICENSE](LICENSE) for details.
-
-## Support
-
-For self-hosted deployment issues, check:
-- Backend logs: `docker compose logs backend`
-- Database status: `docker compose ps postgres`
-- Configuration: review `.env` and `config.yaml`
-
-Email: support@accura.ai (if configured in branding settings)

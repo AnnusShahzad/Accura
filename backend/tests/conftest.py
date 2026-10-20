@@ -11,9 +11,13 @@ import uuid
 
 from cryptography.fernet import Fernet
 
-# Configure the environment *before* anything imports config.py
+# Configure the environment *before* anything imports config.py.
+# Defaults to a throwaway SQLite file; set TEST_DB_ENGINE=postgres (plus
+# DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASSWORD) to run against Postgres.
+# The Postgres database is wiped at the start of the run.
 _TMP_DIR = tempfile.mkdtemp(prefix="accura-tests-")
-os.environ["DB_ENGINE"] = "sqlite"
+TEST_DB_ENGINE = os.environ.get("TEST_DB_ENGINE", "sqlite")
+os.environ["DB_ENGINE"] = TEST_DB_ENGINE
 os.environ["DB_SQLITE_PATH"] = os.path.join(_TMP_DIR, "test.db")
 os.environ["APP_DEBUG"] = "false"
 os.environ["JWT_SECRET"] = "test-secret-key-that-is-long-enough-for-hs256"
@@ -31,9 +35,20 @@ from app import app as accura_app  # noqa: E402
 from models.user import User  # noqa: E402
 
 
+@pytest.fixture(scope="session", autouse=True)
+async def _fresh_postgres():
+    if TEST_DB_ENGINE == "postgres":
+        from models import ALL_TABLES
+
+        for table in reversed(ALL_TABLES):
+            await table.raw(f'DROP TABLE IF EXISTS "{table._meta.tablename}" CASCADE').run()
+    yield
+
+
 @pytest.fixture(scope="session")
 def sanic_app():
     TestManager(accura_app)
+    accura_app.ctx.keep_db_pool = True
     return accura_app
 
 

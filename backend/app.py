@@ -127,7 +127,7 @@ def create_app() -> Sanic:
         logger.info("Accura backend starting – %s", settings.get("app.environment"))
         _check_secrets()
         engine = Conversation._meta.db
-        if not isinstance(engine, SQLiteEngine):
+        if not isinstance(engine, SQLiteEngine) and getattr(engine, "pool", None) is None:
             await engine.start_connection_pool()
         await ensure_schema()
         await _seed_subscription_plans()
@@ -146,7 +146,9 @@ def create_app() -> Sanic:
     @app.after_server_stop
     async def shutdown(app_instance):
         engine = Conversation._meta.db
-        if not isinstance(engine, SQLiteEngine):
+        # The ASGI test client runs the server lifecycle around every
+        # request; it sets keep_db_pool so background tasks keep working.
+        if not isinstance(engine, SQLiteEngine) and not getattr(app_instance.ctx, "keep_db_pool", False):
             await engine.close_connection_pool()
 
     _dedupe_sanic_logs()

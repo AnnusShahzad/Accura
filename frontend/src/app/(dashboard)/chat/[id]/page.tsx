@@ -280,6 +280,7 @@ export default function ChatDetailPage({
   const [isRenaming, setIsRenaming] = useState(false);
   const [newAgentModel, setNewAgentModel] = useState("");
   const [newAgentProvider, setNewAgentProvider] = useState("");
+  const [agentDialogOpen, setAgentDialogOpen] = useState(false);
   const [followUpText, setFollowUpText] = useState("");
   const [searchEnabled, setSearchEnabled] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
@@ -339,7 +340,10 @@ export default function ChatDetailPage({
 
   const handleAddAgent = () => {
     if (newAgentModel && newAgentProvider) {
-      addAgent.mutate({ id, data: { model: newAgentModel, provider: newAgentProvider, role: "generator" } });
+      addAgent.mutate(
+        { id, data: { model: newAgentModel, provider: newAgentProvider, role: "generator" } },
+        { onSuccess: () => setAgentDialogOpen(false) }
+      );
       setNewAgentModel("");
       setNewAgentProvider("");
     }
@@ -449,7 +453,7 @@ export default function ChatDetailPage({
           )}
 
           {/* Add Agent */}
-          <Dialog>
+          <Dialog open={agentDialogOpen} onOpenChange={setAgentDialogOpen}>
             <DialogTrigger asChild>
               <Button size="sm" variant="outline" className="h-7 text-xs gap-1" disabled={isActive}>
                 <Plus className="h-3 w-3" />

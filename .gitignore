@@ -31,3 +31,5 @@ frontend/out/
 .DS_Store
 .idea/
 .vscode/
+.coverage
+htmlcov/

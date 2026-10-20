@@ -35,3 +35,4 @@ redis>=5
 pytest>=8
 pytest-asyncio>=0.24
 sanic-testing>=24.6
+pytest-cov>=5

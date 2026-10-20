@@ -20,7 +20,8 @@ app:
 branding:
   company_name: "Accura"
   logo_url: "/static/logo.png"
-  support_email: "support@accura.ai"
+  # Where contact-form submissions are emailed (empty = only stored for admins)
+  support_email: ""
 
 database:
   # "sqlite" for zero-setup local development, "postgres" for Docker /

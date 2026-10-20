@@ -38,7 +38,7 @@ async def send_email(
     smtp_user = settings.get("smtp.user", "")
     smtp_password = settings.get("smtp.password", "")
     from_name = settings.get("smtp.from_name", "Accura")
-    from_email = settings.get("smtp.from_email", "noreply@accura.ai")
+    from_email = settings.get("smtp.from_email") or "noreply@localhost"
     use_tls = settings.get("smtp.use_tls", True)
 
     if template_name:

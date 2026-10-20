@@ -1,0 +1,42 @@
+name: Bug report
+description: Something doesn't work as documented
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you saw instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open /chat/new
+        2. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: setup
+    attributes:
+      label: How are you running Accura?
+      options:
+        - Local development (npm run dev)
+        - Docker Compose
+        - Render (render.yaml)
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: provider
+    attributes:
+      label: AI provider and models
+      placeholder: e.g. OpenRouter, gpt-oss-20b
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Backend log lines or browser console errors. Remove API keys first.
+      render: text

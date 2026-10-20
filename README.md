@@ -4,6 +4,7 @@
 
 **AI answers that check themselves.** Accura is a self-hosted, multi-agent platform that generates, grades and refines LLM responses until they meet a quality bar.
 
+[![CI](https://github.com/AnnusShahzad/Accura/actions/workflows/ci.yml/badge.svg)](https://github.com/AnnusShahzad/Accura/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
 ![Sanic](https://img.shields.io/badge/Sanic-async-FF0D68)
 ![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white)
@@ -12,7 +13,24 @@
 ![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/AnnusShahzad/Accura)
+
+[Features](#features) · [Screenshots](#screenshots) · [Quick start](#quick-start-local-development) · [Deploy for free](#free-tier-deployment-render) · [Contributing](CONTRIBUTING.md)
+
+<img src="docs/screenshots/hero.png" alt="An Accura conversation in dark mode: the answer carries a 92% evaluator score and the sidebar lists chats, settings and admin pages" width="100%">
+
 </div>
+
+## Why Accura?
+
+A single LLM call gives you whatever the model produced on the first try. Accura puts a second model in charge of checking it: every answer is **scored by an evaluator**, and answers below your bar are **rewritten from the evaluator's feedback** before you ever see them. You see every attempt, its score and the reason it was rejected.
+
+- **Self-checking answers.** Generate, evaluate, refine, with your own threshold and iteration limit.
+- **Multi-agent.** Several generators answer the same prompt in parallel, and the best one wins.
+- **Bring your own key.** OpenAI, Anthropic, Google, DeepSeek, or any OpenAI-compatible endpoint (OpenRouter, Groq, vLLM, Ollama).
+- **Tools over MCP.** Connect Model Context Protocol servers (Streamable HTTP or SSE) and the model can call their tools.
+- **A complete app.** Accounts, guest sessions, plans and billing (Stripe or demo mode), an admin panel, notifications, and light and dark themes that work on phones.
+- **Free to host.** One Docker image, one click on Render's free tier.
 
 ## Results
 
@@ -26,6 +44,8 @@ Measured over 400+ test prompts, against single-pass answers from GPT-OSS 120B /
 | Docker self-host install | **< 8 minutes** |
 
 ## How it works
+
+<img src="docs/screenshots/refinement-dark.png" alt="Two iterations side by side: the first answer scored 64% because it never explained memory cells; the rephrased prompt produced a structured answer that scored 92%" width="100%">
 
 ```
  prompt ──▶ Generator agent(s) ──▶ Evaluator agent ──▶ score ≥ threshold? ──yes──▶ answer
@@ -42,6 +62,31 @@ Accura implements a generate-evaluate-refine loop for AI responses:
 3. **Refine** – Below the threshold, a rephrased prompt is generated from the evaluator's feedback and the loop runs again, until the threshold or the iteration limit is reached.
 
 Several generator agents can work on the same conversation (the best answer wins), and more can be added mid-chat to produce alternatives.
+
+## Screenshots
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/landing-light.png" alt="Landing page in light mode"><br><sub><b>Landing page</b></sub></td>
+    <td width="50%"><img src="docs/screenshots/new-chat-light.png" alt="New conversation form with prompt, generator and evaluator model selection"><br><sub><b>New chat</b>: pick generator and evaluator models</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/code-dark.png" alt="A scored answer containing highlighted Python code"><br><sub><b>Code answers</b> with syntax highlighting (Markdown, tables and math render too)</sub></td>
+    <td><img src="docs/screenshots/conversations-light.png" alt="Conversation list with scores and statuses"><br><sub><b>Conversations</b> with status and score at a glance</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/admin-dark.png" alt="Admin dashboard with user, conversation and revenue statistics"><br><sub><b>Admin dashboard</b></sub></td>
+    <td><img src="docs/screenshots/settings-dark.png" alt="Settings page with quality threshold and iteration limits"><br><sub><b>Settings</b>: thresholds, iterations, preferred models</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/billing-light.png" alt="Billing page with Basic, Pro and Business plans"><br><sub><b>Plans and billing</b> (Stripe or demo mode)</sub></td>
+    <td><img src="docs/screenshots/chat-light.png" alt="A refined answer in light mode"><br><sub><b>Light mode</b></sub></td>
+  </tr>
+</table>
+
+<img src="docs/screenshots/mobile.png" alt="Three phone screenshots: sign-in with guest access, a scored chat answer, and the new chat form" width="100%">
+
+<p align="center"><sub>Works on phones too: sign-in with one-click guest access, a scored answer, and a new chat.</sub></p>
 
 ## Tech Stack
 

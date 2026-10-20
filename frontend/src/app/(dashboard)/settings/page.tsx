@@ -39,7 +39,7 @@ import { useTheme } from "next-themes";
 
 export default function SettingsPage() {
   const { data: settings, isLoading } = useSettings();
-  const { setTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
   const { models } = useModels([settings?.preferred_generator_model, settings?.preferred_evaluator_model]);
   const updateSettings = useUpdateSettings();
 
@@ -70,6 +70,12 @@ export default function SettingsPage() {
       search_enabled: settings?.search_enabled,
     });
   }, [settings, form]);
+
+  // The header toggle changes the theme without saving it, so the switch
+  // follows the theme in use; otherwise Save would undo the header toggle
+  useEffect(() => {
+    if (settings && resolvedTheme) form.setValue("dark_mode", resolvedTheme === "dark");
+  }, [settings, resolvedTheme, form]);
 
   const onSubmit = (data: SettingsFormData) => {
     setTheme(data.dark_mode ? "dark" : "light");

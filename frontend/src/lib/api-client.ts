@@ -127,6 +127,10 @@ async function apiFetch<T>(
     } else {
       clearTokens();
       if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+        // A full reload on purpose: it drops every cached query and store
+        // along with the dead session. This runs outside React, so the
+        // router isn't available here anyway.
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
         window.location.href = "/login?reason=session-ended";
       }
       throw new ApiError("Session expired. Please log in again.", 401);

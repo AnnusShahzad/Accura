@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { authApi } from "@/lib/api-client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import { Eye, EyeOff, Check, X } from "lucide-react";
 
 export default function ResetPasswordClient() {
@@ -135,11 +136,8 @@ export default function ResetPasswordClient() {
               Password reset successful
             </p>
 
-            <Button
-              className="w-full"
-              onClick={() => (window.location.href = "/login")}
-            >
-              Go to Login
+            <Button className="w-full" asChild>
+              <Link href="/login">Go to Login</Link>
             </Button>
           </>
         )}

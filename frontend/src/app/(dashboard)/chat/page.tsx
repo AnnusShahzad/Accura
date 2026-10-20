@@ -94,7 +94,7 @@ export default function ChatListPage() {
                     variant="ghost"
                     size="icon"
                     aria-label="Delete conversation"
-                    className="h-6 w-6 -mr-1 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity hover:bg-destructive/10"
+                    className="relative z-10 h-8 w-8 -mr-2 -my-1 transition-opacity hover:bg-destructive/10 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
                     onClick={(e) => {
                       e.preventDefault();
                       setConfirmId(conv.id);
@@ -105,7 +105,11 @@ export default function ChatListPage() {
                 </div>
 
                 {/* Row 2: Title — clickable */}
-                <Link href={`/chat/${conv.id}`} className="block">
+                {/* Stretched link: the whole card is the tap target */}
+                <Link
+                  href={`/chat/${conv.id}`}
+                  className="block rounded-lg outline-none after:absolute after:inset-0 after:rounded-lg after:content-[''] focus-visible:after:ring-[3px] focus-visible:after:ring-ring/50"
+                >
                   <p className="text-sm font-semibold line-clamp-2 leading-snug hover:text-primary transition-colors">
                     {conv.title || "Untitled conversation"}
                   </p>

@@ -7,7 +7,7 @@ signed-in user in a small Zustand store.
 ## Setup
 
 ```bash
-cp .env.example .env.local   # NEXT_PUBLIC_API_URL, default http://localhost:8000/api/v1
+cp .env.example .env.local   # optional, see below
 npm install                  # or `npm install` at the repository root
 npm run dev                  # http://localhost:3000
 ```
@@ -15,12 +15,22 @@ npm run dev                  # http://localhost:3000
 The backend must be running (see the repository README); `npm run dev` at
 the repository root starts both.
 
+API location (both read at build time):
+
+- `NEXT_PUBLIC_API_URL` – call an API on another host directly, e.g.
+  `https://api.example.com/api/v1` (the API's CORS settings must allow it).
+- otherwise the app calls its own `/api/v1`, which `next.config.ts`
+  proxies to `BACKEND_URL` (default `http://localhost:8000`). The
+  production image uses this mode, with the API in the same container.
+
+Deployment is described in [`../DEPLOYMENT.md`](../DEPLOYMENT.md).
+
 ## Scripts
 
 | Script | Description |
 |:--|:--|
 | `npm run dev` | Development server |
-| `npm run build` | Production build (`NEXT_PUBLIC_API_URL` is inlined at build time) |
+| `npm run build` | Production build (`NEXT_PUBLIC_API_URL`/`BACKEND_URL` are read at build time; `NEXT_OUTPUT=standalone` for the container) |
 | `npm run start` | Serve the production build |
 | `npm run lint` | ESLint (Next.js + React Compiler rules) |
 

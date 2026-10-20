@@ -110,7 +110,7 @@ export function Pricing() {
     : fallbackPlans;
 
   return (
-    <section className="py-24 sm:py-32" id="pricing">
+    <section className="py-16 sm:py-24 lg:py-32" id="pricing">
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
@@ -152,11 +152,11 @@ export function Pricing() {
                       {feature.included ? (
                         <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                       ) : (
-                        <X className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/40" />
+                        <X className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/70" />
                       )}
                       <span
                         className={
-                          feature.included ? "" : "text-muted-foreground/60"
+                          feature.included ? "" : "text-muted-foreground"
                         }
                       >
                         {feature.text}

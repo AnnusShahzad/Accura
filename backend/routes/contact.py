@@ -39,16 +39,19 @@ async def submit_contact(request: Request):
         )
     ).run()
 
-    # Notify admin via email (best-effort)
-    try:
-        from config import settings
-        admin_email = settings.get("branding.support_email", "admin@accura.ai")
-        await send_email(
-            to=admin_email,
-            subject=f"[Contact] {body.subject or body.request_type} from {body.name}",
-            text_body=f"Name: {body.name}\nEmail: {body.email}\nCompany: {body.company}\n\n{body.message}",
-        )
-    except Exception:
-        pass  # Non-critical
+    # Notify the operator by email when an address is configured
+    # (best-effort: the request is stored for the admin panel either way)
+    from config import settings
+
+    admin_email = settings.get("branding.support_email") or ""
+    if admin_email:
+        try:
+            await send_email(
+                to=admin_email,
+                subject=f"[Contact] {body.subject or body.request_type} from {body.name}",
+                text_body=f"Name: {body.name}\nEmail: {body.email}\nCompany: {body.company}\n\n{body.message}",
+            )
+        except Exception:
+            pass  # Non-critical
 
     return success({"id": req_id}, message="Contact request submitted", status=201)

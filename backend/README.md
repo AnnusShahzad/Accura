@@ -77,7 +77,8 @@ backend/
 ├── Dockerfile
 ├── docker-compose.yml
 ├── docker-compose.prod.yml
-├── requirements.txt
+├── requirements.txt        # runtime dependencies
+├── requirements-dev.txt    # + test tooling
 ├── .env.example
 └── .gitignore
 ```
@@ -103,7 +104,7 @@ docker compose exec backend python scripts/create_admin.py you@example.com
 ```bash
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt   # runtime + test dependencies
 
 python app.py                      # tables are created on first start
 python scripts/create_admin.py you@example.com --password 'S3cure!Pass'

@@ -18,7 +18,7 @@ const features = [
     icon: Brain,
     title: "Multi-Agent Generation",
     description:
-      "Run multiple AI models simultaneously — GPT 5.2, GPT 5.1, DeepSeek V3 — and let them compete to give you the best response.",
+      "Run multiple AI models side by side — from OpenAI, Anthropic, Google, DeepSeek or any OpenAI-compatible endpoint — and let them compete to give you the best response.",
   },
   {
     icon: Zap,
@@ -54,7 +54,7 @@ const features = [
 
 export function Features() {
   return (
-    <section className="py-24 sm:py-32" id="features">
+    <section className="py-16 sm:py-24 lg:py-32" id="features">
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">

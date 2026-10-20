@@ -40,13 +40,27 @@ def _load_yaml(path: str) -> dict:
         return yaml.safe_load(fh) or {}
 
 
+def _bool(v: str) -> bool:
+    return v.strip().lower() in ("true", "1", "yes", "on")
+
+
 def _env_overrides() -> dict:
-    """Map environment variables to nested config keys."""
+    """Map environment variables to nested config keys.
+
+    Later entries win when two variables target the same key, so the
+    platform conventions (PORT, DATABASE_URL) come first and the explicit
+    Accura variables can still override them.
+    """
     mapping: list[tuple[str, str, type]] = [
+        # Platform conventions (Render, Railway, Fly, Heroku-style hosts)
+        ("PORT", "app.port", int),
+        ("DATABASE_URL", "database.url", str),
+        # Render: the service's public URL (frontend and API share it there)
+        ("RENDER_EXTERNAL_URL", "app.frontend_url", str),
         ("APP_ENV", "app.environment", str),
         ("APP_HOST", "app.host", str),
         ("APP_PORT", "app.port", int),
-        ("APP_DEBUG", "app.debug", lambda v: v.lower() in ("true", "1", "yes")),
+        ("APP_DEBUG", "app.debug", _bool),
         ("APP_WORKERS", "app.workers", int),
         ("APP_SECRET_KEY", "app.secret_key", str),
         ("APP_FRONTEND_URL", "app.frontend_url", str),
@@ -70,7 +84,7 @@ def _env_overrides() -> dict:
         ("SMTP_PASSWORD", "smtp.password", str),
         ("SMTP_FROM_NAME", "smtp.from_name", str),
         ("SMTP_FROM_EMAIL", "smtp.from_email", str),
-        ("SMTP_USE_TLS", "smtp.use_tls", lambda v: v.lower() in ("true", "1", "yes")),
+        ("SMTP_USE_TLS", "smtp.use_tls", _bool),
         ("OPENAI_API_KEY", "ai.providers.openai.api_key", str),
         ("OPENAI_BASE_URL", "ai.providers.openai.base_url", str),
         ("DEEPSEEK_API_KEY", "ai.providers.deepseek.api_key", str),
@@ -79,6 +93,7 @@ def _env_overrides() -> dict:
         ("GOOGLE_AI_API_KEY", "ai.providers.google.api_key", str),
         ("CUSTOM_AI_API_KEY", "ai.providers.custom.api_key", str),
         ("CUSTOM_AI_BASE_URL", "ai.providers.custom.base_url", str),
+        ("DEFAULT_AI_PROVIDER", "ai.default_provider", str),
         ("DEFAULT_GENERATOR_MODEL", "ai.default_generator_model", str),
         ("DEFAULT_EVALUATOR_MODEL", "ai.default_evaluator_model", str),
         ("DEFAULT_REPROMPT_MODEL", "ai.default_reprompt_model", str),
@@ -90,6 +105,17 @@ def _env_overrides() -> dict:
         ("STRIPE_PRICE_PRO_MONTHLY", "billing.stripe_price_ids.pro_monthly", str),
         ("STRIPE_PRICE_PRO_YEARLY", "billing.stripe_price_ids.pro_yearly", str),
         ("SUPPORT_EMAIL", "branding.support_email", str),
+        ("REGISTRATION_ENABLED", "auth.registration_enabled", _bool),
+        ("GUEST_ENABLED", "auth.guest.enabled", _bool),
+        ("GUEST_TTL_HOURS", "auth.guest.ttl_hours", int),
+        ("GUEST_REQUESTS_PER_MINUTE", "auth.guest.requests_per_minute", int),
+        ("GUEST_REQUESTS_PER_DAY", "auth.guest.requests_per_day", int),
+        ("GUEST_MAX_ITERATIONS", "auth.guest.max_iterations", int),
+        ("GUEST_SIGNUPS_PER_HOUR", "auth.guest.signups_per_hour", int),
+        ("ADMIN_EMAIL", "auth.bootstrap_admin.email", str),
+        ("ADMIN_PASSWORD", "auth.bootstrap_admin.password", str),
+        ("ADMIN_USERNAME", "auth.bootstrap_admin.username", str),
+        ("ALLOW_PRIVATE_URLS", "security.allow_private_urls", _bool),
         ("COMPANY_NAME", "branding.company_name", str),
         ("COMPANY_LOGO_URL", "branding.logo_url", str),
     ]

@@ -25,7 +25,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { GuestAccess } from "@/components/auth/guest-access";
+import { usePublicConfig } from "@/hooks/use-public-config";
 import {
+  Lock,
   Loader2,
   Eye,
   EyeOff,
@@ -35,7 +38,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 
-export default function RegisterPage() {
+function RegisterForm() {
   const { register: registerUser, isRegistering } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -168,28 +171,28 @@ export default function RegisterPage() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Username</FormLabel>
-                  <FormControl>
-                    <div className="relative">
+                  <div className="relative">
+                    <FormControl>
                       <Input placeholder="johndoe" {...field} />
-                      {usernameStatus.checking && (
+                    </FormControl>
+                    {usernameStatus.checking && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                      </div>
+                    )}
+                    {!usernameStatus.checking &&
+                      usernameStatus.available === true && (
                         <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                          <CheckCircle2 className="h-4 w-4 text-green-500" />
                         </div>
                       )}
-                      {!usernameStatus.checking &&
-                        usernameStatus.available === true && (
-                          <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                            <CheckCircle2 className="h-4 w-4 text-green-500" />
-                          </div>
-                        )}
-                      {!usernameStatus.checking &&
-                        usernameStatus.available === false && (
-                          <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                            <AlertCircle className="h-4 w-4 text-destructive" />
-                          </div>
-                        )}
-                    </div>
-                  </FormControl>
+                    {!usernameStatus.checking &&
+                      usernameStatus.available === false && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                          <AlertCircle className="h-4 w-4 text-destructive" />
+                        </div>
+                      )}
+                  </div>
                   {usernameStatus.available === false && (
                     <p className="text-sm text-destructive">
                       {usernameStatus.message}
@@ -229,27 +232,28 @@ export default function RegisterPage() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Password</FormLabel>
-                  <FormControl>
-                    <div className="relative">
+                  <div className="relative">
+                    <FormControl>
                       <Input
                         type={showPassword ? "text" : "password"}
                         placeholder="••••••••"
                         {...field}
                       />
-                      <button
-                        type="button"
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
-                        onClick={() => setShowPassword(!showPassword)}
-                        tabIndex={-1}
-                      >
-                        {showPassword ? (
-                          <EyeOff className="h-4 w-4" />
-                        ) : (
-                          <Eye className="h-4 w-4" />
-                        )}
-                      </button>
-                    </div>
-                  </FormControl>
+                    </FormControl>
+                    <button
+                      type="button"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground cursor-pointer"
+                      onClick={() => setShowPassword(!showPassword)}
+                      tabIndex={-1}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
                   {/* Password strength indicators */}
                   {password.length > 0 && (
                     <div className="mt-2 space-y-1">
@@ -287,29 +291,30 @@ export default function RegisterPage() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Confirm Password</FormLabel>
-                  <FormControl>
-                    <div className="relative">
+                  <div className="relative">
+                    <FormControl>
                       <Input
                         type={showConfirmPassword ? "text" : "password"}
                         placeholder="••••••••"
                         {...field}
                       />
-                      <button
-                        type="button"
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
-                        onClick={() =>
-                          setShowConfirmPassword(!showConfirmPassword)
-                        }
-                        tabIndex={-1}
-                      >
-                        {showConfirmPassword ? (
-                          <EyeOff className="h-4 w-4" />
-                        ) : (
-                          <Eye className="h-4 w-4" />
-                        )}
-                      </button>
-                    </div>
-                  </FormControl>
+                    </FormControl>
+                    <button
+                      type="button"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground cursor-pointer"
+                      onClick={() =>
+                        setShowConfirmPassword(!showConfirmPassword)
+                      }
+                      tabIndex={-1}
+                      aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                    >
+                      {showConfirmPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}
@@ -341,4 +346,37 @@ export default function RegisterPage() {
       </CardFooter>
     </Card>
   );
+}
+
+
+export default function RegisterPage() {
+  const { data: config } = usePublicConfig();
+
+  if (config && !config.registration_enabled) {
+    return (
+      <Card>
+        <CardHeader className="space-y-1">
+          <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+            <Lock className="h-5 w-5 text-muted-foreground" />
+          </div>
+          <CardTitle className="text-2xl font-bold">Registration is closed</CardTitle>
+          <CardDescription>
+            New accounts can&apos;t be created on this server right now.
+            {config.guest.enabled && " You can still try everything with a guest account."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <GuestAccess variant="default" />
+          <p className="text-center text-sm text-muted-foreground">
+            Already have an account?{" "}
+            <Link href="/login" className="font-medium text-primary hover:underline">
+              Sign in
+            </Link>
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return <RegisterForm />;
 }

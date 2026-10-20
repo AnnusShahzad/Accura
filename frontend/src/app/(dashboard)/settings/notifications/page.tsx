@@ -116,6 +116,7 @@ export default function NotificationsSettingsPage() {
                 </div>
               </div>
               <Switch
+                aria-label="In-app notifications"
                 checked={form.watch("notify_in_app")}
                 onCheckedChange={(v) => form.setValue("notify_in_app", v)}
               />
@@ -132,6 +133,7 @@ export default function NotificationsSettingsPage() {
                 </div>
               </div>
               <Switch
+                aria-label="Email notifications"
                 checked={form.watch("notify_email")}
                 onCheckedChange={(v) => form.setValue("notify_email", v)}
               />
@@ -148,6 +150,7 @@ export default function NotificationsSettingsPage() {
                 </div>
               </div>
               <Switch
+                aria-label="Slack notifications"
                 checked={form.watch("notify_slack")}
                 onCheckedChange={(v) => form.setValue("notify_slack", v)}
               />
@@ -164,6 +167,7 @@ export default function NotificationsSettingsPage() {
                 </div>
               </div>
               <Switch
+                aria-label="Microsoft Teams notifications"
                 checked={form.watch("notify_teams")}
                 onCheckedChange={(v) => form.setValue("notify_teams", v)}
               />

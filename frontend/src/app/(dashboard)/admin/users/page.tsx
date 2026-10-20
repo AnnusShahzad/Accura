@@ -115,8 +115,8 @@ export default function AdminUsersPage() {
               <TableRow>
                 <TableHead>User</TableHead>
                 <TableHead>Tier</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Joined</TableHead>
+                <TableHead className="hidden sm:table-cell">Status</TableHead>
+                <TableHead className="hidden md:table-cell">Joined</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -125,23 +125,28 @@ export default function AdminUsersPage() {
                 <TableRow key={user.id}>
                   <TableCell>
                     <div>
-                      <p className="font-medium">
+                      <p className="flex items-center gap-2 font-medium">
                         {user.username}
+                        {user.is_guest && (
+                          <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                            Guest
+                          </Badge>
+                        )}
                       </p>
-                      <p className="text-sm text-muted-foreground">
-                        {user.email}
+                      <p className="max-w-[11rem] truncate text-sm text-muted-foreground sm:max-w-none">
+                        {user.is_guest ? "Deleted automatically" : user.email}
                       </p>
                     </div>
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" className="capitalize">
-                      {user.tier || "free"}
+                      {user.tier || "basic"}
                     </Badge>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="hidden sm:table-cell">
                     <div className="flex items-center gap-2">
                       {user.is_verified ? (
-                        <Badge className="bg-green-500/15 text-green-600">
+                        <Badge className="bg-green-500/15 text-green-800 dark:text-green-400">
                           <CheckCircle className="mr-1 h-3 w-3" />
                           Verified
                         </Badge>
@@ -156,7 +161,7 @@ export default function AdminUsersPage() {
                       )}
                     </div>
                   </TableCell>
-                  <TableCell>{formatDate(user.created_at)}</TableCell>
+                  <TableCell className="hidden md:table-cell">{formatDate(user.created_at)}</TableCell>
                   <TableCell>
                     <Button
                       variant="outline"

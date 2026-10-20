@@ -56,7 +56,7 @@ export default function AuthLayout({
             orchestration with customizable quality thresholds.
           </p>
         </div>
-        <p className="text-sm text-primary-foreground/60">
+        <p className="text-sm text-primary-foreground/80">
           &copy; {new Date().getFullYear()} Accura AI. All rights reserved.
         </p>
       </div>

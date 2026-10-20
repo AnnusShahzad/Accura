@@ -24,9 +24,13 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
+import { GuestAccess } from "@/components/auth/guest-access";
+import { SessionNotice } from "@/components/auth/session-notice";
+import { usePublicConfig } from "@/hooks/use-public-config";
 
 export default function LoginPage() {
   const { login, isLoggingIn } = useAuth();
+  const { data: config } = usePublicConfig();
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
@@ -48,7 +52,8 @@ export default function LoginPage() {
           Enter your credentials to access your account
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
+        <SessionNotice />
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
@@ -78,7 +83,7 @@ export default function LoginPage() {
                     <FormLabel>Password</FormLabel>
                     <Link
                       href="/forgot-password"
-                      className="text-sm text-primary hover:underline"
+                      className="-my-1 inline-block py-1 text-sm text-primary hover:underline"
                     >
                       Forgot password?
                     </Link>
@@ -106,16 +111,28 @@ export default function LoginPage() {
           </form>
         </Form>
       </CardContent>
-      <CardFooter className="flex flex-col space-y-2">
-        <p className="text-sm text-muted-foreground">
-          Don&apos;t have an account?{" "}
-          <Link
-            href="/register"
-            className="font-medium text-primary hover:underline"
-          >
-            Sign up
-          </Link>
-        </p>
+      <CardFooter className="flex flex-col gap-4">
+        {config?.guest.enabled && (
+          <div className="w-full space-y-4">
+            <div className="flex items-center gap-3 text-xs uppercase text-muted-foreground">
+              <span className="h-px flex-1 bg-border" />
+              or
+              <span className="h-px flex-1 bg-border" />
+            </div>
+            <GuestAccess />
+          </div>
+        )}
+        {config?.registration_enabled !== false && (
+          <p className="text-sm text-muted-foreground">
+            Don&apos;t have an account?{" "}
+            <Link
+              href="/register"
+              className="font-medium text-primary hover:underline"
+            >
+              Sign up
+            </Link>
+          </p>
+        )}
       </CardFooter>
     </Card>
   );

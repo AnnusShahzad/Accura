@@ -28,6 +28,7 @@ import {
   DialogTitle,
   DialogFooter,
   DialogTrigger,
+  DialogClose,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,7 @@ export default function ProfilePage() {
   const { setUser } = useAuthStore();
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [confirmPasswordOpen, setConfirmPasswordOpen] = useState(false);
 
   const [showEmailChange, setShowEmailChange] = useState(false);
   const [newEmail, setNewEmail] = useState("");
@@ -134,6 +136,7 @@ export default function ProfilePage() {
       });
       toast.success("Password changed successfully");
       passwordForm.reset();
+      setConfirmPasswordOpen(false);
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : "Failed to change password";
@@ -160,14 +163,16 @@ export default function ProfilePage() {
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">Email</span>
             <div className="flex items-center gap-2">
-              <span className="font-medium">{user?.email}</span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowEmailChange(true)}
-              >
-                Change
-              </Button>
+              <span className="truncate font-medium">{user?.is_guest ? "—" : user?.email}</span>
+              {!user?.is_guest && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowEmailChange(true)}
+                >
+                  Change
+                </Button>
+              )}
             </div>
           </div>
 
@@ -319,36 +324,49 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Change Password</CardTitle>
-          <CardDescription>
-            Update your password for added security
-          </CardDescription>
-        </CardHeader>
+      {user?.is_guest ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Guest account</CardTitle>
+            <CardDescription>
+              Guest accounts have no password or email to change. This account is deleted
+              automatically{user.expires_at ? ` on ${new Date(user.expires_at).toLocaleString()}` : ""}.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>Change Password</CardTitle>
+            <CardDescription>
+              Update your password for added security
+            </CardDescription>
+          </CardHeader>
 
-        <CardContent>
-          <Form {...passwordForm}>
-            <form
-              onSubmit={passwordForm.handleSubmit(onChangePassword)}
-              className="space-y-4"
-            >
-              <FormField
-                control={passwordForm.control}
-                name="old_password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Current Password</FormLabel>
-                    <FormControl>
+          <CardContent>
+            <Form {...passwordForm}>
+              <form
+                onSubmit={passwordForm.handleSubmit(onChangePassword)}
+                className="space-y-4"
+              >
+                <FormField
+                  control={passwordForm.control}
+                  name="old_password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Current Password</FormLabel>
                       <div className="relative">
-                        <Input
-                          type={showOldPassword ? "text" : "password"}
-                          {...field}
-                        />
+                        <FormControl>
+                          <Input
+                            type={showOldPassword ? "text" : "password"}
+                            {...field}
+                          />
+                        </FormControl>
                         <button
                           type="button"
-                          className="absolute right-3 top-1/2 -translate-y-1/2"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1"
                           onClick={() => setShowOldPassword(!showOldPassword)}
+                          aria-label={showOldPassword ? "Hide password" : "Show password"}
                         >
                           {showOldPassword ? (
                             <EyeOff className="h-4 w-4" />
@@ -357,28 +375,29 @@ export default function ProfilePage() {
                           )}
                         </button>
                       </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <FormField
-                control={passwordForm.control}
-                name="new_password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>New Password</FormLabel>
-                    <FormControl>
+                <FormField
+                  control={passwordForm.control}
+                  name="new_password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>New Password</FormLabel>
                       <div className="relative">
-                        <Input
-                          type={showNewPassword ? "text" : "password"}
-                          {...field}
-                        />
+                        <FormControl>
+                          <Input
+                            type={showNewPassword ? "text" : "password"}
+                            {...field}
+                          />
+                        </FormControl>
                         <button
                           type="button"
-                          className="absolute right-3 top-1/2 -translate-y-1/2"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1"
                           onClick={() => setShowNewPassword(!showNewPassword)}
+                          aria-label={showNewPassword ? "Hide password" : "Show password"}
                         >
                           {showNewPassword ? (
                             <EyeOff className="h-4 w-4" />
@@ -387,58 +406,59 @@ export default function ProfilePage() {
                           )}
                         </button>
                       </div>
-                    </FormControl>
 
-                    {newPassword.length > 0 && (
-                      <div className="mt-2 space-y-1">
-                        {passwordChecks.map((check) => (
-                          <div
-                            key={check.label}
-                            className="flex items-center gap-2 text-xs"
-                          >
-                            {check.met ? (
-                              <Check className="h-3 w-3 text-green-500" />
-                            ) : (
-                              <X className="h-3 w-3 text-muted-foreground" />
-                            )}
-
-                            <span
-                              className={
-                                check.met
-                                  ? "text-green-500"
-                                  : "text-muted-foreground"
-                              }
+                      {newPassword.length > 0 && (
+                        <div className="mt-2 space-y-1">
+                          {passwordChecks.map((check) => (
+                            <div
+                              key={check.label}
+                              className="flex items-center gap-2 text-xs"
                             >
-                              {check.label}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                              {check.met ? (
+                                <Check className="h-3 w-3 text-green-500" />
+                              ) : (
+                                <X className="h-3 w-3 text-muted-foreground" />
+                              )}
 
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                              <span
+                                className={
+                                  check.met
+                                    ? "text-green-500"
+                                    : "text-muted-foreground"
+                                }
+                              >
+                                {check.label}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
 
-              <FormField
-                control={passwordForm.control}
-                name="confirmPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Confirm New Password</FormLabel>
-                    <FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={passwordForm.control}
+                  name="confirmPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Confirm New Password</FormLabel>
                       <div className="relative">
-                        <Input
-                          type={showConfirmPassword ? "text" : "password"}
-                          {...field}
-                        />
+                        <FormControl>
+                          <Input
+                            type={showConfirmPassword ? "text" : "password"}
+                            {...field}
+                          />
+                        </FormControl>
                         <button
                           type="button"
-                          className="absolute right-3 top-1/2 -translate-y-1/2"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1"
                           onClick={() =>
                             setShowConfirmPassword(!showConfirmPassword)
                           }
+                          aria-label={showConfirmPassword ? "Hide password" : "Show password"}
                         >
                           {showConfirmPassword ? (
                             <EyeOff className="h-4 w-4" />
@@ -447,42 +467,44 @@ export default function ProfilePage() {
                           )}
                         </button>
                       </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button type="button">Change Password</Button>
-                </DialogTrigger>
+                <Dialog open={confirmPasswordOpen} onOpenChange={setConfirmPasswordOpen}>
+                  <DialogTrigger asChild>
+                    <Button type="button">Change Password</Button>
+                  </DialogTrigger>
 
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Confirm Password Change</DialogTitle>
-                  </DialogHeader>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Confirm Password Change</DialogTitle>
+                    </DialogHeader>
 
-                  <p className="text-sm text-muted-foreground">
-                    Your password will be changed. Continue?
-                  </p>
+                    <p className="text-sm text-muted-foreground">
+                      Your password will be changed. Continue?
+                    </p>
 
-                  <DialogFooter>
-                    <Button variant="outline">Cancel</Button>
+                    <DialogFooter>
+                      <DialogClose asChild>
+                        <Button variant="outline">Cancel</Button>
+                      </DialogClose>
 
-                    <Button
-                      onClick={passwordForm.handleSubmit(onChangePassword)}
-                      disabled={isChangingPassword}
-                    >
-                      Confirm
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
+                      <Button
+                        onClick={passwordForm.handleSubmit(onChangePassword)}
+                        disabled={isChangingPassword}
+                      >
+                        Confirm
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </form>
+            </Form>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

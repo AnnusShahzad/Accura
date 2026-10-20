@@ -34,6 +34,7 @@ _PUBLIC_PATHS: set[str] = {
     "/api/v1/health",
     "/api/v1/billing/plans",
     "/api/v1/billing/webhook",
+    "/api/v1/auth/guest",
 }
 
 _PUBLIC_PREFIXES: tuple[str, ...] = (
@@ -87,6 +88,11 @@ async def auth_middleware(request: Request):
 
     if not user["is_active"]:
         return sanic_json({"success": False, "message": "Account disabled"}, status=403)
+
+    from services.auth_service import guest_expired
+
+    if guest_expired(user):
+        return sanic_json({"success": False, "message": "This guest session has ended"}, status=401)
 
     request.ctx.user = user
 

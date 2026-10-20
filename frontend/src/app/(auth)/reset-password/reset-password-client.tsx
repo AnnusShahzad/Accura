@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { authApi } from "@/lib/api-client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import { Eye, EyeOff, Check, X } from "lucide-react";
 
 export default function ResetPasswordClient() {
@@ -73,8 +74,9 @@ export default function ResetPasswordClient() {
 
               <button
                 type="button"
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground"
                 onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? (
                   <EyeOff className="h-4 w-4" />
@@ -122,24 +124,24 @@ export default function ResetPasswordClient() {
 
             {status === "error" && (
               <div className="space-y-1 text-center text-sm">
-                <p className="text-red-500">{errorMessage}</p>
-                <a href="/forgot-password" className="text-primary underline-offset-4 hover:underline">
+                <p className="text-destructive">{errorMessage}</p>
+                <Link
+                  href="/forgot-password"
+                  className="inline-block py-1 text-primary underline-offset-4 hover:underline"
+                >
                   Request a new reset link
-                </a>
+                </Link>
               </div>
             )}
           </>
         ) : (
           <>
-            <p className="text-green-600 text-center font-semibold">
+            <p className="text-green-800 dark:text-green-400 text-center font-semibold">
               Password reset successful
             </p>
 
-            <Button
-              className="w-full"
-              onClick={() => (window.location.href = "/login")}
-            >
-              Go to Login
+            <Button className="w-full" asChild>
+              <Link href="/login">Go to Login</Link>
             </Button>
           </>
         )}

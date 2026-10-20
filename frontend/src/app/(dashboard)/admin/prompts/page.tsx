@@ -115,7 +115,7 @@ export default function AdminPromptsPage() {
         <div>
           <h1 className="text-2xl font-bold">System Prompts</h1>
           <p className="text-muted-foreground">
-            Manage system prompts for generator, evaluator, and critic agents
+            Manage system prompts for the generator, evaluator and re-prompt agents
           </p>
         </div>
         <Button onClick={openCreate}>
@@ -151,7 +151,7 @@ export default function AdminPromptsPage() {
                       {prompt.role}
                     </CardTitle>
                     {prompt.is_active ? (
-                      <Badge className="bg-green-500/15 text-green-600">Active</Badge>
+                      <Badge className="bg-green-500/15 text-green-800 dark:text-green-400">Active</Badge>
                     ) : (
                       <Badge variant="secondary">Inactive</Badge>
                     )}
@@ -161,12 +161,13 @@ export default function AdminPromptsPage() {
                       variant="ghost"
                       size="icon"
                       onClick={() => openEdit(prompt)}
+                      aria-label="Edit"
                     >
                       <Pencil className="h-4 w-4" />
                     </Button>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" aria-label="Delete">
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </AlertDialogTrigger>

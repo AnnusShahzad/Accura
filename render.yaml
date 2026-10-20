@@ -1,0 +1,64 @@
+# =============================================================================
+# Accura – Render Blueprint (free tier, everything on Render)
+#
+# Dashboard → New → Blueprint → pick this repository. Render creates:
+#   * accura     – ONE web service running the frontend and the API together
+#                  (see Dockerfile): one URL, nothing to wire up between them
+#   * accura-db  – PostgreSQL (free plan)
+#
+# Values marked `sync: false` are asked for when the Blueprint is created.
+# See DEPLOYMENT.md for the full walkthrough.
+# =============================================================================
+
+databases:
+  - name: accura-db
+    plan: free
+    databaseName: accura
+    user: accura
+
+services:
+  - type: web
+    name: accura
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    # Goes through the web server to the API, so it checks both halves
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      # Free instances are single-process; background runs live in it
+      - key: APP_WORKERS
+        value: "1"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: accura-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ENCRYPTION_KEY
+        generateValue: true
+      # Public demo defaults: no sign-up, one-click guest sessions,
+      # and no user-supplied URLs pointing at private networks
+      - key: REGISTRATION_ENABLED
+        value: "false"
+      - key: GUEST_ENABLED
+        value: "true"
+      - key: GUEST_TTL_HOURS
+        value: "24"
+      - key: ALLOW_PRIVATE_URLS
+        value: "false"
+      # Your admin account, created on first start (no shell needed)
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      # At least one AI provider. For a single OpenAI-compatible endpoint
+      # (OpenRouter, Groq, Together, ...) leave this empty and add
+      # CUSTOM_AI_* and DEFAULT_AI_PROVIDER=custom plus DEFAULT_*_MODEL
+      # in the service's Environment tab instead.
+      - key: OPENAI_API_KEY
+        sync: false

@@ -21,6 +21,7 @@ from schemas.mcp import CreateMCPServerRequest, UpdateMCPServerRequest
 from services.mcp_service import get_accessible_server, list_mcp_tools
 from utils.crypto import encrypt
 from utils.responses import error, success, validation_error
+from utils.url_guard import UnsafeURLError, ensure_public_url
 
 bp = Blueprint("mcp", url_prefix="/api/v1/mcp-servers")
 
@@ -33,6 +34,12 @@ async def create_mcp_server(request: Request):
         body = CreateMCPServerRequest(**(request.json or {}))
     except Exception as exc:
         return validation_error(exc)
+    for url, what in ((body.url, "MCP server URL"),):
+        if url:
+            try:
+                await ensure_public_url(url, what=what)
+            except UnsafeURLError as exc:
+                return error(str(exc), status=422)
 
     user_id = str(request.ctx.user["id"])
     server_id = str(uuid.uuid4())
@@ -102,6 +109,12 @@ async def update_mcp_server(request: Request, server_id: str):
         body = UpdateMCPServerRequest(**(request.json or {}))
     except Exception as exc:
         return validation_error(exc)
+    for url, what in ((body.url, "MCP server URL"),):
+        if url:
+            try:
+                await ensure_public_url(url, what=what)
+            except UnsafeURLError as exc:
+                return error(str(exc), status=422)
 
     user_id = str(request.ctx.user["id"])
 

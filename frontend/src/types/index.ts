@@ -49,6 +49,8 @@ export interface User {
   is_active: boolean;
   is_verified: boolean;
   is_admin: boolean;
+  is_guest?: boolean;
+  expires_at?: string | null;
   created_at: string;
 }
 
@@ -462,6 +464,30 @@ export interface ContactRequestItem {
   resolved_by: string;
   created_at: string;
   updated_at: string;
+}
+
+// ─── Public Config ───
+export interface PublicConfig {
+  registration_enabled: boolean;
+  guest: {
+    enabled: boolean;
+    ttl_hours: number;
+    max_iterations: number;
+    requests_per_day: number;
+  };
+  billing_mode: "stripe" | "demo";
+  search_enabled: boolean;
+  ai: {
+    available_providers: string[];
+    default_provider: string;
+    default_generator_model: string;
+    default_evaluator_model: string;
+  };
+  branding: { company_name: string; support_email: string };
+}
+
+export interface GuestTokenResponse extends TokenResponse {
+  expires_at: string;
 }
 
 // ─── API Response Wrappers ───

@@ -77,7 +77,29 @@ export function useAuth() {
     }
   });
 
+  const guestMutation = useMutation({
+    mutationFn: () => authApi.guest(),
+    onSuccess: async () => {
+      const res = await userApi.getMe();
+      setUser(res.data.user, res.data.profile);
+      queryClient.invalidateQueries();
+      toast.success("Guest session started");
+      router.push("/chat");
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Could not start a guest session");
+    },
+  });
+
   const logout = () => {
+    // A guest has no password: once the tokens are gone, so is the account
+    if (
+      user?.is_guest &&
+      typeof window !== "undefined" &&
+      !window.confirm("Log out of this guest session? You won't be able to come back to it.")
+    ) {
+      return;
+    }
     authApi.logout();
     clearUser();
     queryClient.clear();
@@ -94,6 +116,8 @@ export function useAuth() {
     logout,
     isLoggingIn: loginMutation.isPending,
     isRegistering: registerMutation.isPending,
+    loginAsGuest: guestMutation.mutateAsync,
+    isStartingGuest: guestMutation.isPending,
     forgotPassword: forgotPasswordMutation.mutateAsync,
     resetPassword: resetPasswordMutation.mutateAsync,
     isRequestingPasswordReset: forgotPasswordMutation.isPending,

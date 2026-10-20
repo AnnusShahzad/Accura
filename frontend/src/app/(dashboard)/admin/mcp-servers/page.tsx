@@ -174,7 +174,7 @@ export default function AdminMcpServersPage() {
                     <p className="font-medium">{server.name}</p>
                     <Badge variant="outline">{server.transport}</Badge>
                     {server.is_active ? (
-                      <Badge className="bg-green-500/15 text-green-600">Active</Badge>
+                      <Badge className="bg-green-500/15 text-green-800 dark:text-green-400">Active</Badge>
                     ) : (
                       <Badge variant="secondary">Inactive</Badge>
                     )}
@@ -191,12 +191,13 @@ export default function AdminMcpServersPage() {
                     variant="ghost"
                     size="icon"
                     onClick={() => openEdit(server)}
+                    aria-label="Edit"
                   >
                     <Pencil className="h-4 w-4" />
                   </Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button variant="ghost" size="icon">
+                      <Button variant="ghost" size="icon" aria-label="Delete">
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </AlertDialogTrigger>

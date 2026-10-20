@@ -19,7 +19,7 @@ from config import settings
 from models.user import User, UserProfile
 from models.settings import UserSettings
 from utils.email import send_email
-from utils.exceptions import AuthenticationError, ValidationError
+from utils.exceptions import AuthenticationError, AuthorizationError, ValidationError
 
 logger = logging.getLogger("accura.auth_service")
 
@@ -128,6 +128,42 @@ def decode_token(token: str) -> dict:
         raise AuthenticationError("Invalid token")
 
 
+def token_pair(user: dict) -> dict:
+    return {
+        "access_token": create_access_token(str(user["id"]), extra={"tier": user["tier"]}),
+        "refresh_token": create_refresh_token(str(user["id"])),
+        "token_type": "bearer",
+        "expires_in": _ACCESS_EXPIRE * 60,
+    }
+
+
+def guest_expired(user: dict) -> bool:
+    expires_at = user.get("expires_at")
+    if not user.get("is_guest") or not expires_at:
+        return False
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    return datetime.now(timezone.utc) >= expires_at
+
+
+def ensure_not_guest(user: dict | None, action: str) -> None:
+    if user and user.get("is_guest"):
+        raise AuthorizationError(f"Guest accounts can't {action}.")
+
+
+def new_user_settings(user_id: str, **overrides) -> UserSettings:
+    """Settings row for a new user, preferring the server's default models
+    (so a deployment that only has, say, an OpenRouter key works out of
+    the box) over the column defaults."""
+    values = {
+        "preferred_generator_model": settings.get("ai.default_generator_model") or "gpt-5.2",
+        "preferred_evaluator_model": settings.get("ai.default_evaluator_model") or "gpt-5.1",
+        "preferred_critic_model": settings.get("ai.default_evaluator_model") or "gpt-5.1",
+        **overrides,
+    }
+    return UserSettings(id=str(uuid.uuid4()), user=user_id, **values)
+
+
 # ---------------------------------------------------------------------------
 # Registration
 # ---------------------------------------------------------------------------
@@ -140,6 +176,11 @@ async def register_user(
     last_name: str = "",
 ) -> dict:
     """Create a new user account with default settings and profile."""
+
+    if not settings.get("auth.registration_enabled", True):
+        raise AuthorizationError(
+            "Registration is closed on this server. You can try Accura with a guest account instead."
+        )
 
     # Validate username and password on server side
     validate_username(username)
@@ -222,12 +263,7 @@ async def register_user(
     ).run()
 
     # Create default settings
-    await UserSettings.insert(
-        UserSettings(
-            id=str(uuid.uuid4()),
-            user=user_id,
-        )
-    ).run()
+    await UserSettings.insert(new_user_settings(user_id)).run()
 
     # Send OTP verification email
     try:
@@ -295,15 +331,7 @@ async def login_user(email: str, password: str) -> dict:
             status_code=403
         )
 
-    access = create_access_token(str(user["id"]), extra={"tier": user["tier"]})
-    refresh = create_refresh_token(str(user["id"]))
-
-    return {
-        "access_token": access,
-        "refresh_token": refresh,
-        "token_type": "bearer",
-        "expires_in": _ACCESS_EXPIRE * 60,
-    }
+    return token_pair(user)
 
 
 # ---------------------------------------------------------------------------
@@ -321,16 +349,10 @@ async def refresh_tokens(refresh_token: str) -> dict:
     user = await User.select().where(User.id == user_id).first().run()
     if not user or not user["is_active"]:
         raise AuthenticationError("User not found or deactivated")
+    if guest_expired(user):
+        raise AuthenticationError("This guest session has ended")
 
-    access = create_access_token(str(user["id"]), extra={"tier": user["tier"]})
-    refresh = create_refresh_token(str(user["id"]))
-
-    return {
-        "access_token": access,
-        "refresh_token": refresh,
-        "token_type": "bearer",
-        "expires_in": _ACCESS_EXPIRE * 60,
-    }
+    return token_pair(user)
 
 
 # ---------------------------------------------------------------------------
@@ -502,6 +524,7 @@ async def change_password(user_id: str, old_password: str, new_password: str) ->
     user = await User.select().where(User.id == user_id).first().run()
     if not user:
         raise AuthenticationError("User not found")
+    ensure_not_guest(user, "change their password")
 
     if not verify_password(old_password, user["hashed_password"]):
         raise AuthenticationError("Current password is incorrect")
@@ -551,6 +574,7 @@ async def request_email_change(user_id: str, new_email: str) -> bool:
     user = await User.select().where(User.id == user_id).first().run()
     if not user:
         raise AuthenticationError("User not found")
+    ensure_not_guest(user, "change their email address")
 
     token = create_access_token(
         user_id,
@@ -599,3 +623,95 @@ async def confirm_email_change(token: str) -> str:
 
     logger.info("User %s changed email to %s", user_id, new_email)
     return new_email
+
+
+# ---------------------------------------------------------------------------
+# Guest accounts
+# ---------------------------------------------------------------------------
+
+async def create_guest() -> dict:
+    """Create a throwaway, already-verified account and log it in."""
+    if not settings.get("auth.guest.enabled", False):
+        raise AuthorizationError("Guest access is not enabled on this server")
+
+    ttl_hours = int(settings.get("auth.guest.ttl_hours", 24))
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=ttl_hours)
+    suffix = secrets.token_hex(5)
+    user_id = str(uuid.uuid4())
+
+    user = {
+        "id": user_id,
+        "email": f"guest-{suffix}@guest.accura.invalid",
+        "username": f"guest_{suffix}",
+        "tier": "basic",
+    }
+    await User.insert(
+        User(
+            **user,
+            # Nobody knows this password; guests only ever use their tokens
+            hashed_password=hash_password(secrets.token_urlsafe(32)),
+            is_verified=True,
+            is_guest=True,
+            expires_at=expires_at,
+        )
+    ).run()
+    await UserProfile.insert(
+        UserProfile(id=str(uuid.uuid4()), user=user_id, first_name="Guest")
+    ).run()
+    cap = int(settings.get("auth.guest.max_iterations", 3))
+    await UserSettings.insert(new_user_settings(user_id, max_iterations=min(5, cap))).run()
+
+    logger.info("Created guest account %s (expires %s)", user["username"], expires_at.isoformat())
+    return {**token_pair(user), "expires_at": expires_at.isoformat()}
+
+
+# ---------------------------------------------------------------------------
+# Bootstrap admin
+# ---------------------------------------------------------------------------
+
+async def ensure_bootstrap_admin() -> None:
+    """Create or promote the admin named by ADMIN_EMAIL / ADMIN_PASSWORD.
+
+    Hosts like Render's free tier have no shell, so create_admin.py can't
+    be run there. Re-applying the password on every start also gives the
+    operator a way to reset it.
+    """
+    email = (settings.get("auth.bootstrap_admin.email") or "").strip().lower()
+    password = settings.get("auth.bootstrap_admin.password") or ""
+    if not email or not password:
+        return
+    try:
+        validate_password(password)
+    except ValidationError as exc:
+        logger.error("ADMIN_PASSWORD rejected, bootstrap admin not created: %s", exc.message)
+        return
+
+    user = await User.select().where(User.email == email).first().run()
+    if user:
+        updates = {User.is_admin: True, User.is_verified: True, User.is_active: True}
+        if not verify_password(password, user["hashed_password"]):
+            updates[User.hashed_password] = hash_password(password)
+        await User.update(updates).where(User.id == user["id"]).run()
+        return
+
+    username = (settings.get("auth.bootstrap_admin.username") or "").strip()
+    if not username:
+        username = re.sub(r"[^a-zA-Z0-9_]", "_", email.split("@")[0])
+    username = (username + "_admin")[:150] if len(username) < 5 else username[:150]
+    if await User.select(User.id).where(User.username == username).first().run():
+        username = f"{username}_{secrets.token_hex(3)}"
+
+    user_id = str(uuid.uuid4())
+    await User.insert(
+        User(
+            id=user_id,
+            email=email,
+            username=username,
+            hashed_password=hash_password(password),
+            is_admin=True,
+            is_verified=True,
+        )
+    ).run()
+    await UserProfile.insert(UserProfile(id=str(uuid.uuid4()), user=user_id)).run()
+    await UserSettings.insert(new_user_settings(user_id)).run()
+    logger.info("Created bootstrap admin %s", email)

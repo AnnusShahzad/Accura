@@ -76,7 +76,7 @@ npm install                 # frontend + root tooling
 npm run setup:backend       # creates backend/.venv and installs requirements
 
 cp backend/.env.example backend/.env
-cp frontend/.env.example frontend/.env.local
+cp frontend/.env.example frontend/.env.local   # optional: defaults proxy /api/v1 to localhost:8000
 ```
 
 Edit `backend/.env` and set at least:
@@ -100,7 +100,7 @@ cd backend
 .venv/bin/python scripts/create_admin.py you@example.com --password 'S3cure!Pass'
 ```
 
-Without SMTP configured, verification codes and reset links are printed to the backend log when `APP_DEBUG=true`.
+Without SMTP configured, verification codes and reset links are printed to the backend log when `APP_DEBUG=true`. Alternatively set `ADMIN_EMAIL`/`ADMIN_PASSWORD` and the admin is created on startup.
 
 ### Root scripts
 
@@ -113,6 +113,10 @@ Without SMTP configured, verification codes and reset links are printed to the b
 | `npm run lint` | Lint the frontend |
 | `npm test` | Backend test suite |
 | `npm run dev:infra` / `stop:infra` | Start / stop PostgreSQL and Redis in Docker |
+
+## Free-tier deployment (Render)
+
+[`DEPLOYMENT.md`](DEPLOYMENT.md) puts Accura online for free on Render alone: the frontend and API run as one web service from the root [`Dockerfile`](Dockerfile), with a free PostgreSQL database, set up in one click via [`render.yaml`](render.yaml). It's configured as a public demo, with registration closed and guest sessions that are deleted automatically.
 
 ## Docker (self-hosted)
 
@@ -156,6 +160,11 @@ Most important variables:
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO_MONTHLY`, `STRIPE_PRICE_PRO_YEARLY` | Real payments; leave empty for demo billing |
 | `REDIS_URL` | Shared rate limiting across workers (in-memory when unset) |
 | `APP_CORS_ORIGINS` | Comma-separated allowed origins |
+| `DATABASE_URL`, `PORT` | Platform-style database URL and listening port (take precedence) |
+| `REGISTRATION_ENABLED`, `GUEST_ENABLED`, `GUEST_TTL_HOURS` | Sign-up switch and throwaway guest accounts |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Admin account created/updated on startup (for hosts without a shell) |
+| `ALLOW_PRIVATE_URLS` | Set `false` on public servers: user-supplied URLs may not target private networks |
+| `DEFAULT_AI_PROVIDER` | Provider used when none is chosen (e.g. `custom` for an OpenRouter-only setup) |
 
 ## Features
 

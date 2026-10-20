@@ -18,6 +18,7 @@ from models.api_key import UserAPIKey
 from schemas.api_key import CreateAPIKeyRequest, UpdateAPIKeyRequest
 from utils.crypto import encrypt, decrypt
 from utils.responses import error, success, validation_error
+from utils.url_guard import UnsafeURLError, ensure_public_url
 
 bp = Blueprint("api_keys", url_prefix="/api/v1/api-keys")
 
@@ -40,6 +41,12 @@ async def create_api_key(request: Request):
         body = CreateAPIKeyRequest(**(request.json or {}))
     except Exception as exc:
         return validation_error(exc)
+    for url, what in ((body.base_url, "API base URL"),):
+        if url:
+            try:
+                await ensure_public_url(url, what=what)
+            except UnsafeURLError as exc:
+                return error(str(exc), status=422)
 
     user_id = str(request.ctx.user["id"])
     key_id = str(uuid.uuid4())
@@ -101,6 +108,12 @@ async def update_api_key(request: Request, key_id: str):
         body = UpdateAPIKeyRequest(**(request.json or {}))
     except Exception as exc:
         return validation_error(exc)
+    for url, what in ((body.base_url, "API base URL"),):
+        if url:
+            try:
+                await ensure_public_url(url, what=what)
+            except UnsafeURLError as exc:
+                return error(str(exc), status=422)
 
     user_id = str(request.ctx.user["id"])
 

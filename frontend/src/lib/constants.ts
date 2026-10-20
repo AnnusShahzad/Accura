@@ -1,6 +1,8 @@
 // ─── API Base ───
-export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+// Set NEXT_PUBLIC_API_URL to call the backend directly (e.g. from Vercel
+// to Render). Otherwise requests go to this app's own /api/v1, which
+// next.config.ts proxies to BACKEND_URL.
+export const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "/api/v1").replace(/\/+$/, "");
 
 // ─── Subscription Tiers ───
 export const TIERS = {
@@ -28,10 +30,6 @@ export const AI_MODELS = [
   { value: "openai/gpt-oss-120b", label: "GPT-OSS 120B (custom endpoint)", provider: "custom" },
   { value: "openai/gpt-oss-20b", label: "GPT-OSS 20B (custom endpoint)", provider: "custom" },
 ] as const;
-
-export function providerForModel(model: string | undefined): string {
-  return AI_MODELS.find((m) => m.value === model)?.provider ?? "openai";
-}
 
 // ─── AI Providers ───
 export const AI_PROVIDERS = [
@@ -90,5 +88,4 @@ export const DEFAULTS = {
   timeoutSeconds: 120,
   preferredGeneratorModel: "gpt-5.2",
   preferredEvaluatorModel: "gpt-5.1",
-  preferredCriticModel: "gpt-5.1",
 } as const;

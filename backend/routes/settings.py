@@ -6,7 +6,6 @@ PUT  /api/v1/settings
 
 from __future__ import annotations
 
-import uuid
 from datetime import datetime, timezone
 
 from sanic import Blueprint, Request
@@ -14,8 +13,10 @@ from sanic import Blueprint, Request
 
 from middleware.auth_middleware import require_auth
 from models.settings import UserSettings
+from services.auth_service import new_user_settings
 from schemas.settings import UpdateSettingsRequest
 from utils.responses import error, success, validation_error
+from utils.url_guard import UnsafeURLError, ensure_public_url
 
 bp = Blueprint("settings", url_prefix="/api/v1/settings")
 
@@ -31,12 +32,9 @@ async def get_settings(request: Request):
 
     if not user_settings:
         # Create defaults
-        settings_id = str(uuid.uuid4())
-        await UserSettings.insert(
-            UserSettings(id=settings_id, user=user_id)
-        ).run()
+        await UserSettings.insert(new_user_settings(user_id)).run()
         user_settings = await UserSettings.select().where(
-            UserSettings.id == settings_id
+            UserSettings.user == user_id
         ).first().run()
 
     return success(user_settings)
@@ -49,6 +47,12 @@ async def update_settings(request: Request):
         body = UpdateSettingsRequest(**(request.json or {}))
     except Exception as exc:
         return validation_error(exc)
+    for url, what in ((body.slack_webhook_url, "Slack webhook URL"), (body.teams_webhook_url, "Teams webhook URL"),):
+        if url:
+            try:
+                await ensure_public_url(url, what=what)
+            except UnsafeURLError as exc:
+                return error(str(exc), status=422)
 
     user_id = str(request.ctx.user["id"])
     updates = body.model_dump(exclude_none=True)
@@ -67,7 +71,7 @@ async def update_settings(request: Request):
         ).run()
     else:
         await UserSettings.insert(
-            UserSettings(id=str(uuid.uuid4()), user=user_id, **updates)
+            new_user_settings(user_id, **updates)
         ).run()
 
     updated = await UserSettings.select().where(

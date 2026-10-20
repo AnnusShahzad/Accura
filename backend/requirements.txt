@@ -30,9 +30,3 @@ email-validator>=2
 
 # Rate limiting across workers (optional at runtime, see redis.url)
 redis>=5
-
-# Testing
-pytest>=8
-pytest-asyncio>=0.24
-sanic-testing>=24.6
-pytest-cov>=5

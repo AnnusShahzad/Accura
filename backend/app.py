@@ -23,6 +23,7 @@ from routes.chat import bp as chat_bp
 from routes.contact import bp as contact_bp
 from routes.mcp import bp as mcp_bp
 from routes.notifications import bp as notifications_bp
+from routes.public import bp as public_bp
 from routes.settings import bp as settings_bp
 from routes.user import bp as user_bp
 
@@ -99,6 +100,7 @@ def create_app() -> Sanic:
     app.blueprint(notifications_bp)
     app.blueprint(contact_bp)
     app.blueprint(admin_bp)
+    app.blueprint(public_bp)
 
     # --- Health check ---
     @app.get("/api/v1/health")
@@ -135,13 +137,26 @@ def create_app() -> Sanic:
 
         await apply_admin_config()
 
+        from services.auth_service import ensure_bootstrap_admin
+        from services.maintenance import fail_interrupted_runs
+
+        # Once per process (the ASGI test client re-runs these hooks
+        # around every request)
+        if not getattr(app_instance.ctx, "bootstrapped", False):
+            app_instance.ctx.bootstrapped = True
+            await ensure_bootstrap_admin()
+            # Runs live in the process that started them, so with a single
+            # worker every run still marked active died with the old process.
+            if int(settings.get("app.workers", 1)) <= 1:
+                await fail_interrupted_runs(all_active=True)
+
     @app.after_server_start
     async def start_background_jobs(app_instance):
-        app_instance.add_task(_renewal_loop(), name="subscription-renewals")
+        app_instance.add_task(_maintenance_loop, name="maintenance")
 
     @app.before_server_stop
     async def stop_background_jobs(app_instance):
-        await app_instance.cancel_task("subscription-renewals", raise_exception=False)
+        await app_instance.cancel_task("maintenance", raise_exception=False)
 
     @app.after_server_stop
     async def shutdown(app_instance):
@@ -155,18 +170,15 @@ def create_app() -> Sanic:
     return app
 
 
-async def _renewal_loop():
-    """Periodically roll over subscriptions whose billing period ended."""
+async def _maintenance_loop():
+    """Guest purge, temporary-chat cleanup, stale-run recovery, renewals."""
     import asyncio
 
-    from services.billing_service import renew_due_subscriptions
+    from services.maintenance import run_periodic_maintenance
 
-    interval = max(60, int(settings.get("billing.renewal_check_interval", 3600)))
+    interval = max(30, int(settings.get("maintenance.interval_seconds", 300)))
     while True:
-        try:
-            await renew_due_subscriptions()
-        except Exception:
-            logger.exception("Subscription renewal job failed")
+        await run_periodic_maintenance()
         await asyncio.sleep(interval)
 
 

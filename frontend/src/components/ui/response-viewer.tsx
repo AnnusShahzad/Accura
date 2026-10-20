@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, Expand } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,8 @@ type ResponseViewerProps = {
   title?: string;
   className?: string;
   previewHeight?: number;
+  /** "plain" drops the card chrome, for use inside a chat bubble */
+  variant?: "card" | "plain";
 };
 
 export function ResponseViewer({
@@ -28,13 +30,30 @@ export function ResponseViewer({
   title = "Response",
   className,
   previewHeight = 320,
+  variant = "card",
 }: ResponseViewerProps) {
   const [expanded, setExpanded] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [measuredHeight, setMeasuredHeight] = useState<number | null>(null);
 
-  const shouldCollapse = useMemo(() => {
+  // Collapse based on the rendered height, not character counts: a short
+  // answer with a formula, table or list can still be very tall, and a
+  // long single paragraph on a wide screen may fit.
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => setMeasuredHeight(el.scrollHeight));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const heuristicCollapse = useMemo(() => {
     const lineCount = content.split("\n").length;
     return content.length > 900 || lineCount > 18;
   }, [content]);
+  // Small slack so a box isn't collapsed to hide just a line or two
+  const shouldCollapse =
+    measuredHeight === null ? heuristicCollapse : measuredHeight > previewHeight + 48;
 
   const wordCount = useMemo(() => {
     return content.trim().split(/\s+/).filter(Boolean).length;
@@ -45,7 +64,8 @@ export function ResponseViewer({
   return (
     <div
       className={cn(
-        "rounded-2xl border border-border/70 bg-gradient-to-b from-background to-muted/20 p-4 shadow-sm sm:p-6",
+        variant === "card" &&
+          "rounded-2xl border border-border/70 bg-gradient-to-b from-background to-muted/20 p-4 shadow-sm sm:p-6",
         className
       )}
     >
@@ -58,15 +78,27 @@ export function ResponseViewer({
           shouldCollapse && !expanded ? { maxHeight: `${previewHeight}px` } : undefined
         }
       >
-        <MarkdownContent content={content} />
+        <div ref={contentRef}>
+          <MarkdownContent content={content} />
+        </div>
 
         {shouldCollapse && !expanded && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-background via-background/95 to-transparent" />
+          <div
+            className={cn(
+              "pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t to-transparent",
+              variant === "card" ? "from-background via-background/95" : "from-card via-card/95"
+            )}
+          />
         )}
       </div>
 
       {shouldCollapse && (
-        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border/60 pt-4">
+        <div
+          className={cn(
+            "flex flex-wrap items-center gap-2 border-t border-border/60",
+            variant === "card" ? "mt-4 pt-4" : "mt-3 pt-3"
+          )}
+        >
           <Button
             type="button"
             size="sm"

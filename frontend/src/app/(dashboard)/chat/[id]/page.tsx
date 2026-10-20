@@ -11,7 +11,7 @@ import {
   useSendFollowUpMessage,
 } from "@/hooks/use-chat";
 import { useSettings } from "@/hooks/use-settings";
-import { AI_MODELS } from "@/lib/constants";
+import { useModels } from "@/hooks/use-models";
 import { formatDate, formatNumber, cn } from "@/lib/utils";
 import {
   Card,
@@ -91,7 +91,7 @@ function ErrorBubble({
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-destructive/30 bg-destructive/10">
         <XCircle className="h-4 w-4 text-destructive" />
       </div>
-      <div className="max-w-[72%] space-y-2 rounded-2xl rounded-bl-sm border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm">
+      <div className="min-w-0 max-w-[85%] space-y-2 rounded-2xl rounded-bl-sm border border-destructive/30 bg-destructive/5 px-3 py-3 text-sm sm:max-w-[72%] sm:px-4">
         <p className="font-medium text-destructive">The response could not be generated</p>
         <p className="text-muted-foreground whitespace-pre-wrap">{message.content}</p>
         <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -127,7 +127,7 @@ function ThinkingBubble({
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 border border-primary/20">
         <Bot className="h-4 w-4 text-primary" />
       </div>
-      <div className="max-w-[70%] rounded-2xl rounded-bl-sm border bg-card px-4 py-3 shadow-sm">
+      <div className="min-w-0 max-w-[85%] rounded-2xl rounded-bl-sm border bg-card px-3 py-3 shadow-sm sm:max-w-[70%] sm:px-4">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
           <span className="font-medium">Thinking…</span>
@@ -163,7 +163,6 @@ function MessageBubble({
   searchEnabled: boolean;
 }) {
   const isUser = message.role === "user";
-  const [expanded, setExpanded] = useState(false);
 
   return (
     <div className={cn("flex items-end gap-3", isUser ? "flex-row-reverse" : "flex-row")}>
@@ -186,7 +185,7 @@ function MessageBubble({
       {/* Bubble */}
       <div
         className={cn(
-          "max-w-[72%] space-y-1.5 rounded-2xl border px-4 py-3 shadow-sm",
+          "min-w-0 max-w-[85%] space-y-1.5 rounded-2xl border px-3 py-3 shadow-sm sm:max-w-[78%] sm:px-4 lg:max-w-[72%]",
           isUser
             ? "rounded-br-sm bg-primary text-primary-foreground border-primary"
             : "rounded-bl-sm bg-card border-border"
@@ -227,30 +226,19 @@ function MessageBubble({
         {isUser ? (
           <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
         ) : (
-          <div className={cn("text-sm overflow-hidden", !expanded && "max-h-64")}>
-            <ResponseViewer
-              content={message.content}
-              title="Response"
-              previewHeight={expanded ? undefined : 200}
-            />
-          </div>
-        )}
-
-        {/* Expand button for long assistant responses */}
-        {!isUser && message.content && message.content.length > 500 && (
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mt-1 transition-colors"
-          >
-            <ChevronDown
-              className={cn("h-3 w-3 transition-transform", expanded && "rotate-180")}
-            />
-            {expanded ? "Collapse" : "Expand full response"}
-          </button>
+          // The viewer collapses tall answers itself and offers Expand /
+          // Open Reader; clipping it here as well hid those controls.
+          <ResponseViewer
+            content={message.content}
+            title="Response"
+            variant="plain"
+            previewHeight={360}
+            className="text-sm"
+          />
         )}
 
         {/* Timestamp */}
-        <p className={cn("text-xs mt-1", isUser ? "text-primary-foreground/60 text-right" : "text-muted-foreground")}>
+        <p className={cn("text-xs mt-1", isUser ? "text-primary-foreground/80 text-right" : "text-muted-foreground")}>
           {formatDate(message.created_at)}
         </p>
       </div>
@@ -272,6 +260,7 @@ export default function ChatDetailPage({
   );
   const retry = useRetryConversation();
   const { data: settings } = useSettings();
+  const { models, providerOf, searchAvailable } = useModels();
   const renameConversation = useRenameConversation();
   const addAgent = useAddAgent();
   const sendFollowUp = useSendFollowUpMessage();
@@ -312,7 +301,7 @@ export default function ChatDetailPage({
 
   if (isLoading) {
     return (
-      <div className="flex h-[calc(100vh-120px)] flex-col gap-4">
+      <div className="flex h-full flex-col gap-4">
         <Skeleton className="h-10 w-1/3" />
         <Skeleton className="flex-1 w-full" />
         <Skeleton className="h-14 w-full" />
@@ -393,17 +382,20 @@ export default function ChatDetailPage({
   const threshold = meta?.threshold ?? conversation.threshold ?? settings?.global_threshold ?? 75;
 
   return (
-    <div className="flex h-[calc(100vh-100px)] flex-col gap-0">
+    <div className="flex h-full min-h-[24rem] flex-col gap-0">
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between pb-3 border-b shrink-0">
-        <div className="flex items-center gap-3 min-w-0">
+      {/* Title and badges share a row on wide screens and stack on phones,
+          where the badges used to squeeze the title down to "Phot..." */}
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 pb-3 border-b shrink-0">
+        <div className="flex min-w-0 flex-1 basis-56 items-center gap-2">
           {isRenaming ? (
-            <div className="flex items-center gap-2">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
               <Input
                 value={renameTitle}
                 onChange={(e) => setRenameTitle(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleRename()}
-                className="w-56 h-8"
+                aria-label="Conversation title"
+                className="h-8 min-w-0 flex-1 sm:max-w-xs"
                 autoFocus
               />
               <Button size="sm" className="h-8" onClick={handleRename}>Save</Button>
@@ -411,7 +403,7 @@ export default function ChatDetailPage({
             </div>
           ) : (
             <>
-              <h1 className={cn("text-lg font-bold truncate max-w-xs", !conversation.title && "text-muted-foreground")}>
+              <h1 className={cn("min-w-0 truncate text-lg font-bold", !conversation.title && "text-muted-foreground")}>
                 {conversation.title || "Untitled conversation"}
               </h1>
               <Button variant="ghost" size="icon" aria-label="Rename conversation" className="h-7 w-7 shrink-0" onClick={() => { setRenameTitle(conversation.title); setIsRenaming(true); }}>
@@ -421,7 +413,7 @@ export default function ChatDetailPage({
           )}
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2">
           <Badge variant="outline" className="gap-1 text-xs">
             <Coins className="h-3 w-3" />
             {formatNumber((conversation.tokens_input || 0) + (conversation.tokens_output || 0))} Tokens
@@ -475,17 +467,19 @@ export default function ChatDetailPage({
                   value={newAgentModel}
                   onValueChange={(val) => {
                     setNewAgentModel(val);
-                    const model = AI_MODELS.find((m) => m.value === val);
-                    if (model) setNewAgentProvider(model.provider);
+                    setNewAgentProvider(providerOf(val));
                   }}
                 >
                   <SelectTrigger className="mt-1">
                     <SelectValue placeholder="Select model" />
                   </SelectTrigger>
                   <SelectContent>
-                    {AI_MODELS.map((model) => (
-                      <SelectItem key={model.value} value={model.value}>
+                    {models.map((model) => (
+                      <SelectItem key={model.value} value={model.value} disabled={!model.usable}>
                         {model.label}
+                        {!model.usable && (
+                          <span className="ml-1 text-xs text-muted-foreground">· needs API key</span>
+                        )}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -564,9 +558,18 @@ export default function ChatDetailPage({
         ) : (
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2 px-1">
-              <Switch checked={searchEnabled} onCheckedChange={setSearchEnabled} id="web-search-toggle" />
-              <label htmlFor="web-search-toggle" className="text-xs font-medium cursor-pointer flex items-center gap-1">
+              <Switch
+                checked={searchEnabled && searchAvailable}
+                onCheckedChange={setSearchEnabled}
+                id="web-search-toggle"
+                disabled={!searchAvailable}
+              />
+              <label
+                htmlFor="web-search-toggle"
+                className={cn("text-xs font-medium flex items-center gap-1", searchAvailable ? "cursor-pointer" : "text-muted-foreground")}
+              >
                 <Search className="h-3 w-3" /> Web Search
+                {!searchAvailable && <span className="font-normal">(not configured)</span>}
               </label>
             </div>
             <div className="flex items-end gap-2">
@@ -589,6 +592,7 @@ export default function ChatDetailPage({
               onClick={handleSendFollowUp}
               disabled={!followUpText.trim() || sendFollowUp.isPending}
               className="shrink-0"
+              aria-label="Send message"
             >
               {sendFollowUp.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

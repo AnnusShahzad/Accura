@@ -48,7 +48,19 @@ function layoutChecks(page, mobile) {
       if (cs.display === "none" || cs.visibility === "hidden" || el.classList.contains("sr-only")) continue;
       const r = el.getBoundingClientRect();
       if (!r.width || !r.height) continue;
-      if (el.closest("[data-radix-scroll-area-viewport], pre, code, table, [data-slot=sidebar], .katex-display")) continue;
+      if (el.closest("pre, code, [data-slot=sidebar], .katex-display")) continue;
+      // Content may be wider than the screen only inside a container that
+      // scrolls sideways on purpose (a table wrapper, a code block). Radix
+      // scroll areas only scroll vertically here, so they don't count: a
+      // too-wide bubble inside one is clipped, which is exactly the bug
+      // this check exists to catch.
+      let scrolls = false;
+      for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+        if (p.hasAttribute("data-radix-scroll-area-viewport")) continue;
+        const ox = getComputedStyle(p).overflowX;
+        if (ox === "auto" || ox === "scroll") { scrolls = true; break; }
+      }
+      if (scrolls) continue;
       if (r.right > vw + 2 && cs.position !== "fixed") out.push(`wider than viewport: ${describe(el)}`);
       if (el.children.length === 0 && el.innerText && el.innerText.trim().length > 2 &&
           el.scrollWidth > el.clientWidth + 2 && cs.overflow !== "visible" &&

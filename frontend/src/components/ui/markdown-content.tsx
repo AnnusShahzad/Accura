@@ -193,7 +193,13 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
             </MarkdownCode>
           ),
           table: ({ children }) => (
-            <div className="my-7 w-full overflow-x-auto rounded-xl border bg-card shadow-sm">
+            // Focusable so wide tables can be scrolled sideways from the keyboard
+            <div
+              className="my-7 w-full overflow-x-auto rounded-xl border bg-card shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+              tabIndex={0}
+              role="region"
+              aria-label="Table"
+            >
               <table className="w-full min-w-[520px] border-collapse text-sm">
                 {children}
               </table>

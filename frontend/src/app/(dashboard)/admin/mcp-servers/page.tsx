@@ -12,7 +12,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import {
@@ -52,7 +51,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Server, Plus, Pencil, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -71,17 +69,21 @@ export default function AdminMcpServersPage() {
   });
 
   const saveMutation = useMutation({
-    mutationFn: (data: CreateMcpServerFormData) =>
-      editing
-        ? adminApi.updateMcpServer(editing.id, data)
-        : adminApi.createMcpServer(data),
+    mutationFn: (data: CreateMcpServerFormData) => {
+      // A blank key field means "keep the current key", not "remove it"
+      const { api_key, ...rest } = data;
+      const payload = api_key ? { ...rest, api_key } : rest;
+      return editing
+        ? adminApi.updateMcpServer(editing.id, payload)
+        : adminApi.createMcpServer(payload);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "mcp-servers"] });
       toast.success(editing ? "Server updated" : "Server added");
       setIsDialogOpen(false);
       setEditing(null);
     },
-    onError: () => toast.error("Failed to save server"),
+    onError: (e: Error) => toast.error(e.message || "Failed to save server"),
   });
 
   const deleteMutation = useMutation({
@@ -90,6 +92,7 @@ export default function AdminMcpServersPage() {
       queryClient.invalidateQueries({ queryKey: ["admin", "mcp-servers"] });
       toast.success("Server deleted");
     },
+    onError: (e: Error) => toast.error(e.message || "Failed to delete server"),
   });
 
   const form = useForm<CreateMcpServerFormData>({
@@ -99,7 +102,7 @@ export default function AdminMcpServersPage() {
       url: "",
       api_key: "",
       description: "",
-      transport: "sse",
+      transport: "http",
     },
     values: editing
       ? {
@@ -119,7 +122,7 @@ export default function AdminMcpServersPage() {
       url: "",
       api_key: "",
       description: "",
-      transport: "sse",
+      transport: "http",
     });
     setIsDialogOpen(true);
   };

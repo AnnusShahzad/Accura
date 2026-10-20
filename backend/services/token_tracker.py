@@ -8,10 +8,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 
-from piccolo.query import Sum
-
 from models.chat import Conversation, Iteration
-from models.user import User
 
 logger = logging.getLogger("accura.token_tracker")
 
@@ -22,8 +19,7 @@ async def record_tokens(
     tokens_output: int,
 ) -> None:
     """Increment token counts on a conversation."""
-    conv = await Conversation.select().where(Conversation.id == conversation_id).first().run()
-    if conv:
+    if tokens_input or tokens_output:
         await Conversation.update({
             Conversation.tokens_input: Conversation.tokens_input + tokens_input,
             Conversation.tokens_output: Conversation.tokens_output + tokens_output,
@@ -35,33 +31,58 @@ async def get_user_token_usage(
     period_start: datetime | None = None,
     period_end: datetime | None = None,
 ) -> dict:
-    """Aggregate token usage for a user within a date range."""
+    """Aggregate token usage for a user within a date range.
+
+    Iterations are the source of truth: each one records the tokens spent
+    generating, evaluating and rephrasing in that round.
+    """
     query = Iteration.select(
-        Sum(Iteration.tokens_input),
-        Sum(Iteration.tokens_output),
+        Iteration.conversation,
+        Iteration.tokens_input,
+        Iteration.tokens_output,
     ).where(
         Iteration.conversation.is_in(
             Conversation.select(Conversation.id).where(Conversation.user == user_id)
         )
     )
-
     if period_start:
         query = query.where(Iteration.created_at >= period_start)
     if period_end:
         query = query.where(Iteration.created_at <= period_end)
+    rows = await query.run()
 
-    result = await query.run()
-    row = result[0] if result else {}
+    per_conv: dict[str, dict] = {}
+    for row in rows:
+        key = str(row["conversation"])
+        entry = per_conv.setdefault(key, {"tokens_input": 0, "tokens_output": 0})
+        entry["tokens_input"] += row["tokens_input"] or 0
+        entry["tokens_output"] += row["tokens_output"] or 0
 
-    total_input = row.get("sum", 0) or 0
-    total_output = row.get("sum", 0) or 0
+    breakdown = []
+    if per_conv:
+        convs = await Conversation.select(
+            Conversation.id, Conversation.title, Conversation.created_at
+        ).where(Conversation.id.is_in(list(per_conv))).run()
+        for conv in convs:
+            usage = per_conv[str(conv["id"])]
+            breakdown.append({
+                "conversation_id": str(conv["id"]),
+                "title": conv["title"],
+                "created_at": conv["created_at"],
+                **usage,
+            })
+        breakdown.sort(key=lambda b: b["tokens_input"] + b["tokens_output"], reverse=True)
+
+    total_input = sum(u["tokens_input"] for u in per_conv.values())
+    total_output = sum(u["tokens_output"] for u in per_conv.values())
 
     return {
         "total_input_tokens": total_input,
         "total_output_tokens": total_output,
         "total_tokens": total_input + total_output,
-        "period_start": (period_start or datetime.min).isoformat(),
+        "period_start": (period_start or datetime(1970, 1, 1, tzinfo=timezone.utc)).isoformat(),
         "period_end": (period_end or datetime.now(timezone.utc)).isoformat(),
+        "breakdown": breakdown[:50],
     }
 
 

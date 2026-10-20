@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { adminApi } from "@/lib/api-client";
-import { formatNumber } from "@/lib/utils";
+import { formatDate, formatNumber } from "@/lib/utils";
 import type { AdminDashboard } from "@/types";
 import {
   Card,
@@ -145,7 +145,7 @@ export default function AdminDashboardPage() {
                   <div>
                     <p className="text-sm font-medium">{tx.description}</p>
                     <p className="text-xs text-muted-foreground">
-                      {tx.created_at}
+                      {formatDate(tx.created_at)}
                     </p>
                   </div>
                   <p className="font-medium">${tx.amount.toFixed(2)}</p>

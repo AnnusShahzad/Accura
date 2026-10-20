@@ -12,7 +12,30 @@ from models.admin import AdminConfig, SystemPrompt, DomainRule
 from models.api_key import UserAPIKey
 from models.contact import ContactRequest
 
+# Creation order matters: referenced tables must exist first.
+ALL_TABLES = (
+    User,
+    UserProfile,
+    SubscriptionPlan,
+    Subscription,
+    Transaction,
+    Conversation,
+    ChatAgent,
+    Iteration,
+    ChatMessage,
+    UserSettings,
+    MCPServer,
+    Notification,
+    NotificationPreference,
+    AdminConfig,
+    SystemPrompt,
+    DomainRule,
+    UserAPIKey,
+    ContactRequest,
+)
+
 __all__ = [
+    "ALL_TABLES",
     "User",
     "UserProfile",
     "Subscription",

@@ -27,24 +27,27 @@ _PUBLIC_PATHS: set[str] = {
     "/api/v1/auth/verify-email",
     "/api/v1/auth/verify-otp",
     "/api/v1/auth/resend-otp",
-    "/api/v1/auth/forgot-password",   
-    "/api/v1/auth/reset-password", 
-    "/api/v1/auth/forgot-password",   
-    "/api/v1/auth/reset-password", 
+    "/api/v1/auth/forgot-password",
+    "/api/v1/auth/reset-password",
+    "/api/v1/auth/verify-email-change",
     "/api/v1/contact",
     "/api/v1/health",
-    "/api/v1/plans",
     "/api/v1/billing/plans",
-    "/api/v1/auth/verify-email-change",
+    "/api/v1/billing/webhook",
 }
 
+_PUBLIC_PREFIXES: tuple[str, ...] = (
+    "/api/v1/auth/check-username/",
+    "/api/v1/public",
+)
+
+
 def _is_public(path: str) -> bool:
-    if path.startswith("/api/v1/auth/check-username/"):
-        return True
-    return path in _PUBLIC_PATHS or path.startswith("/api/v1/public")
+    # Routes are registered without strict slashes, so "/contact" and
+    # "/contact/" reach the same handler and must be treated alike.
+    normalized = path.rstrip("/") or "/"
+    return normalized in _PUBLIC_PATHS or path.startswith(_PUBLIC_PREFIXES)
 
-
-    return path in _PUBLIC_PATHS or path.startswith("/api/v1/public")
 
 async def auth_middleware(request: Request):
     """Sanic middleware – attaches ``request.ctx.user`` for authenticated routes."""
@@ -68,6 +71,11 @@ async def auth_middleware(request: Request):
         return sanic_json({"success": False, "message": "Token expired"}, status=401)
     except jwt.InvalidTokenError:
         return sanic_json({"success": False, "message": "Invalid token"}, status=401)
+
+    # Refresh, password-reset and email-change tokens are signed with the
+    # same key; only genuine access tokens may authenticate API calls.
+    if payload.get("type") != "access":
+        return sanic_json({"success": False, "message": "Invalid token type"}, status=401)
 
     user_id = payload.get("sub")
     if not user_id:

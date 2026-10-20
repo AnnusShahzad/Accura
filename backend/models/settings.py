@@ -16,10 +16,12 @@ from piccolo.columns import (
 from piccolo.columns.defaults.timestamptz import TimestamptzNow
 from piccolo.table import Table
 
+from models.base import JSONTable
+
 from models.user import User
 
 
-class UserSettings(Table, tablename="user_settings"):
+class UserSettings(JSONTable, tablename="user_settings"):
     """Per-user settings (one row per user)."""
 
     id = UUID(primary_key=True)

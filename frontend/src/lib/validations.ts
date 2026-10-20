@@ -66,8 +66,15 @@ export const resetPasswordSchema = z
   .object({
     new_password: z
       .string()
-      .min(8, "Password must be at least 8 characters")
-      .max(128),
+      .min(9, "Password must be greater than 8 characters")
+      .max(128)
+      .regex(/[A-Z]/, "Password must contain at least 1 uppercase letter")
+      .regex(/[a-z]/, "Password must contain at least 1 lowercase letter")
+      .regex(/[0-9]/, "Password must contain at least 1 number")
+      .regex(
+        /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/,
+        "Password must contain at least 1 special character"
+      ),
     confirmPassword: z.string(),
   })
   .refine((data) => data.new_password === data.confirmPassword, {
@@ -128,19 +135,32 @@ export const settingsSchema = z.object({
   notify_email: z.boolean().optional(),
   notify_slack: z.boolean().optional(),
   notify_teams: z.boolean().optional(),
-  slack_webhook_url: z.string().max(500).optional(),
-  teams_webhook_url: z.string().max(500).optional(),
+  slack_webhook_url: z
+    .string()
+    .max(500)
+    .regex(/^(https:\/\/\S+)?$/, "Must be an https:// URL")
+    .optional(),
+  teams_webhook_url: z
+    .string()
+    .max(500)
+    .regex(/^(https:\/\/\S+)?$/, "Must be an https:// URL")
+    .optional(),
   dark_mode: z.boolean().optional(),
   search_enabled: z.boolean().optional(),
 });
 
 // ─── API Key Validations ───
-export const createApiKeySchema = z.object({
-  provider: z.string().min(1, "Provider is required").max(50),
-  label: z.string().max(255),
-  api_key: z.string().min(1, "API key is required"),
-  base_url: z.string().url("Must be a valid URL").or(z.literal("")),
-});
+export const createApiKeySchema = z
+  .object({
+    provider: z.string().min(1, "Provider is required").max(50),
+    label: z.string().max(255),
+    api_key: z.string().trim().min(1, "API key is required"),
+    base_url: z.string().url("Must be a valid URL").or(z.literal("")),
+  })
+  .refine((d) => d.provider !== "custom" || d.base_url !== "", {
+    message: "A base URL is required for custom providers",
+    path: ["base_url"],
+  });
 
 // ─── MCP Server Validations ───
 export const createMcpServerSchema = z.object({
@@ -148,7 +168,7 @@ export const createMcpServerSchema = z.object({
   url: z.string().min(1, "URL is required"),
   api_key: z.string().optional(),
   description: z.string(),
-  transport: z.enum(["sse", "stdio", "http"]),
+  transport: z.enum(["http", "sse"]),
 });
 
 // ─── Contact Validations ───

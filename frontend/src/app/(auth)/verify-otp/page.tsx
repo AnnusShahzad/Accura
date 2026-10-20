@@ -77,8 +77,8 @@ function VerifyOTPContent() {
       setVerified(true);
       toast.success("Email verified successfully!");
       setTimeout(() => router.push("/login"), 2000);
-    } catch (error: any) {
-      toast.error(error.message || "Invalid OTP code");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Invalid OTP code");
     } finally {
       setIsVerifying(false);
     }
@@ -92,8 +92,8 @@ function VerifyOTPContent() {
       setOtp(["", "", "", "", "", ""]);
       setCountdown(60);
       inputRefs.current[0]?.focus();
-    } catch (error: any) {
-      toast.error(error.message || "Failed to resend code");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to resend code");
     } finally {
       setIsResending(false);
     }

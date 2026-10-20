@@ -9,6 +9,7 @@ import type {
   VerifyEmailRequest,
   ChangePasswordRequest,
   UserWithProfile,
+  RegisterResponse,
   ProfileUpdateRequest,
   CreateConversationRequest,
   ConversationListItem,
@@ -68,64 +69,77 @@ function clearTokens() {
 }
 
 // ─── Base Fetch ───
+// Auth endpoints answer 401 for bad credentials; those must surface as
+// errors, not trigger a token refresh and a redirect to /login.
+const NO_REFRESH_PATHS = ["/auth/login", "/auth/register", "/auth/refresh", "/auth/verify-otp", "/auth/resend-otp", "/auth/forgot-password", "/auth/reset-password", "/auth/verify-email-change"];
+
+async function parseError(res: Response): Promise<ApiError> {
+  const err = await res.json().catch(() => ({}));
+  return new ApiError(err.message || res.statusText || "Request failed", res.status, err.errors);
+}
+
 async function apiFetch<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
   const url = `${API_BASE_URL}${path}`;
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    ...(options.headers as Record<string, string>),
+  const buildHeaders = () => {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...(options.headers as Record<string, string>),
+    };
+    const token = getAccessToken();
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    return headers;
   };
 
-  const token = getAccessToken();
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
+  const send = async () => {
+    try {
+      return await fetch(url, { ...options, headers: buildHeaders() });
+    } catch (e) {
+      // network error, e.g. backend not reachable
+      const message = e instanceof Error ? e.message : "Failed to fetch";
+      throw new ApiError(
+        `Cannot reach the Accura API (${message}). Is the backend running?`,
+        0
+      );
+    }
+  };
 
-  let res: Response;
-  try {
-    console.debug("apiFetch", url, options);
-    res = await fetch(url, { ...options, headers });
-  } catch (e: any) {
-    // network error, e.g. backend not reachable
-    console.error("apiFetch network error", url, e);
-    throw new ApiError(e.message || "Failed to fetch", 0);
-  }
+  const hadToken = !!getAccessToken();
+  let res = await send();
 
-  if (res.status === 401 && token) {
-    // Attempt token refresh
-    const refreshed = await tryRefreshToken();
-    if (refreshed) {
-      headers["Authorization"] = `Bearer ${getAccessToken()}`;
-      const retryRes = await fetch(url, { ...options, headers });
-      if (!retryRes.ok) {
-        const err = await retryRes.json().catch(() => ({}));
-        throw new ApiError(
-          err.message || retryRes.statusText,
-          retryRes.status
-        );
-      }
-      return retryRes.json();
+  if (res.status === 401 && hadToken && !NO_REFRESH_PATHS.includes(path)) {
+    if (await tryRefreshToken()) {
+      res = await send();
     } else {
       clearTokens();
-      if (typeof window !== "undefined") {
+      if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
         window.location.href = "/login";
       }
-      throw new ApiError("Session expired", 401);
+      throw new ApiError("Session expired. Please log in again.", 401);
     }
   }
 
-  if (!res.ok) {
-    console.error("apiFetch non-ok", url, res.status, res.statusText);
-    const err = await res.json().catch(() => ({}));
-    throw new ApiError(err.message || res.statusText, res.status);
-  }
-
+  if (!res.ok) throw await parseError(res);
+  if (res.status === 204) return undefined as T;
   return res.json();
 }
 
-async function tryRefreshToken(): Promise<boolean> {
+// Concurrent 401s (several queries polling at once) share one refresh
+// request instead of racing and invalidating each other's tokens.
+let refreshInFlight: Promise<boolean> | null = null;
+
+function tryRefreshToken(): Promise<boolean> {
+  if (!refreshInFlight) {
+    refreshInFlight = doRefresh().finally(() => {
+      refreshInFlight = null;
+    });
+  }
+  return refreshInFlight;
+}
+
+async function doRefresh(): Promise<boolean> {
   const refreshToken = getRefreshToken();
   if (!refreshToken) return false;
 
@@ -148,10 +162,16 @@ async function tryRefreshToken(): Promise<boolean> {
 
 export class ApiError extends Error {
   status: number;
-  constructor(message: string, status: number) {
+  errors?: { field: string; message: string }[];
+  constructor(
+    message: string,
+    status: number,
+    errors?: { field: string; message: string }[]
+  ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.errors = errors;
   }
 }
 
@@ -160,7 +180,7 @@ export class ApiError extends Error {
 // ═══════════════════════════════════════════════════════
 export const authApi = {
   register(data: RegisterRequest) {
-    return apiFetch<ApiResponse<{ user_id: string }>>("/auth/register", {
+    return apiFetch<ApiResponse<RegisterResponse>>("/auth/register", {
       method: "POST",
       body: JSON.stringify(data),
     });
@@ -212,13 +232,10 @@ export const authApi = {
   },
 
   verifyEmailChange(token: string) {
-    return fetch(`${API_BASE_URL}/auth/verify-email-change`, {
+    return apiFetch<ApiResponse<{ email: string }>>("/auth/verify-email-change", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
       body: JSON.stringify({ token }),
-    }).then(res => res.json());
+    });
   },
 
   verifyOtp(data: { email: string; otp: string }) {
@@ -299,7 +316,7 @@ export const chatApi = {
   },
 
   addAgent(id: string, data: AddAgentRequest) {
-    return apiFetch<ApiResponse<Conversation>>(`/chat/${id}/agent`, {
+    return apiFetch<ApiResponse<{ agent_id: string }>>(`/chat/${id}/agent`, {
       method: "POST",
       body: JSON.stringify(data),
     });
@@ -327,6 +344,12 @@ export const chatApi = {
     return apiFetch<ApiResponse<Conversation>>(`/chat/${id}/message`, {
       method: "POST",
       body: JSON.stringify(data),
+    });
+  },
+
+  retry(id: string) {
+    return apiFetch<ApiResponse<Conversation>>(`/chat/${id}/retry`, {
+      method: "POST",
     });
   },
 };
@@ -409,7 +432,7 @@ export const mcpApi = {
   },
 
   test(id: string) {
-    return apiFetch<ApiResponse<{ status: string }>>(`/mcp-servers/${id}/test`, {
+    return apiFetch<ApiResponse<{ tools: { name: string; description: string }[] }>>(`/mcp-servers/${id}/test`, {
       method: "POST",
     });
   },
@@ -424,7 +447,7 @@ export const billingApi = {
   },
 
   subscribe(data: CreateSubscriptionRequest) {
-    return apiFetch<ApiResponse<Subscription>>("/billing/subscribe", {
+    return apiFetch<ApiResponse<Subscription | { checkout_url: string }>>("/billing/subscribe", {
       method: "POST",
       body: JSON.stringify(data),
     });
@@ -461,9 +484,13 @@ export const notificationsApi = {
     );
   },
 
-  markAsRead(id: string) {
-    return apiFetch<ApiResponse<null>>(`/notifications/${id}/read`, {
-      method: "PATCH",
+  unreadCount() {
+    return apiFetch<ApiResponse<{ count: number }>>("/notifications/unread-count");
+  },
+
+  delete(id: string) {
+    return apiFetch<ApiResponse<null>>(`/notifications/${id}`, {
+      method: "DELETE",
     });
   },
 
@@ -510,7 +537,7 @@ export const adminApi = {
   },
 
   getUser(id: string) {
-    return apiFetch<ApiResponse<UserWithProfile>>(`/admin/users/${id}`);
+    return apiFetch<ApiResponse<User>>(`/admin/users/${id}`);
   },
 
   updateUser(id: string, data: AdminUserUpdateRequest) {
@@ -528,6 +555,12 @@ export const adminApi = {
     return apiFetch<ApiResponse<AdminConfig>>("/admin/config", {
       method: "PUT",
       body: JSON.stringify(data),
+    });
+  },
+
+  deleteConfig(key: string) {
+    return apiFetch<ApiResponse<null>>(`/admin/config/${encodeURIComponent(key)}`, {
+      method: "DELETE",
     });
   },
 
@@ -620,21 +653,11 @@ export const adminApi = {
     );
   },
 
-  resolveContactRequest(id: string) {
-    return apiFetch<ApiResponse<null>>(`/admin/contact-requests/${id}`, {
-      method: "PUT",
-    });
-  },
-
-  updateContactRequest(id: string, data: { status: string; reply?: string }) {
+  updateContactRequest(id: string, data: { status: "resolved" | "open"; reply?: string }) {
     return apiFetch<ApiResponse<null>>(`/admin/contact-requests/${id}`, {
       method: "PUT",
       body: JSON.stringify(data),
     });
-  },
-
-  getContactRequests({ page = 1 }: { page?: number } = {}) {
-    return this.listContactRequests(page);
   },
 
   // Alias methods so pages can use camelCase variants

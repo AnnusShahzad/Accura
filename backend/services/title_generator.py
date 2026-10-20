@@ -91,8 +91,12 @@ async def generate_title(
             type(exc).__name__, exc, traceback.format_exc(),
         )
 
-    # Fallback: first few words of the prompt as a title
+    return fallback_title(prompt)
+
+
+def fallback_title(prompt: str) -> str:
+    """First few words of the prompt, used when no model title is available."""
     words = prompt.strip().split()
     if len(words) > 8:
         return " ".join(words[:8]) + "..."
-    return prompt.strip() or "New Conversation"
+    return prompt.strip()[:200] or "New Conversation"

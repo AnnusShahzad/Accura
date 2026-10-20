@@ -27,6 +27,14 @@ export interface VerifyEmailRequest {
   token: string;
 }
 
+export interface RegisterResponse {
+  id: string;
+  email: string;
+  username: string;
+  tier: string;
+  already_exists_unverified?: boolean;
+}
+
 export interface ChangePasswordRequest {
   old_password: string;
   new_password: string;
@@ -46,7 +54,7 @@ export interface User {
 
 export interface UserProfile {
   id: string;
-  user_id: string;
+  user: string;
   first_name: string;
   last_name: string;
   avatar_url: string;
@@ -96,7 +104,7 @@ export interface AddAgentRequest {
 
 export interface ChatAgent {
   id: string;
-  conversation_id: string;
+  conversation: string;
   role: "generator" | "evaluator";
   provider: string;
   model: string;
@@ -107,8 +115,10 @@ export interface ChatAgent {
 
 export interface Iteration {
   id: string;
+  conversation: string;
+  agent: string;
+  turn: number;
   iteration_number: number;
-  agent_id: string;
   rephrased_prompt: string;
   response: string;
   score: number;
@@ -120,15 +130,26 @@ export interface Iteration {
   created_at: string;
 }
 
+export interface ChatMessageMetadata {
+  agent_id?: string;
+  model?: string;
+  turn?: number;
+  alternative?: boolean;
+  failed_agents?: number;
+  type?: "error";
+}
+
 export interface ChatMessage {
   id: string;
-  conversation_id: string;
+  conversation: string;
   role: "user" | "assistant" | "system" | "evaluator";
   content: string;
   score?: number | null;
-  metadata?: Record<string, unknown>;
+  metadata?: ChatMessageMetadata;
   created_at: string;
 }
+
+export type ConversationStatus = "active" | "completed" | "failed" | "archived";
 
 export interface FollowUpMessageRequest {
   prompt: string;
@@ -139,7 +160,7 @@ export interface Conversation {
   id: string;
   title: string;
   prompt: string;
-  status: "active" | "completed" | "archived";
+  status: ConversationStatus;
   best_response: string;
   best_score: number;
   tokens_input: number;
@@ -153,25 +174,32 @@ export interface Conversation {
   agents: ChatAgent[];
   iterations: Iteration[];
   messages: ChatMessage[];
+  updated_at?: string;
   metadata?: {
+    turn?: number;
     current_iteration?: number;
     current_best_score?: number;
     max_iterations?: number;
+    threshold?: number;
+    agents?: number;
+    error?: string;
   };
 }
 
 export interface ConversationListItem {
   id: string;
   title: string;
-  status: "active" | "completed" | "archived";
+  status: ConversationStatus;
   best_score: number;
+  search_enabled?: boolean;
   created_at: string;
+  updated_at?: string;
 }
 
 // ─── Settings Types ───
 export interface UserSettings {
   id: string;
-  user_id: string;
+  user: string;
   global_threshold: number;
   max_iterations: number;
   timeout_seconds: number;
@@ -242,7 +270,7 @@ export interface MCPServer {
   description: string;
   is_active: boolean;
   is_global: boolean;
-  transport: "sse" | "stdio" | "http";
+  transport: "http" | "sse";
   headers: Record<string, string>;
   metadata: Record<string, unknown>;
   created_at: string;
@@ -280,16 +308,20 @@ export interface SubscriptionPlan {
   requests_per_day: number;
   max_tokens_per_request: number;
   features: string[];
+  is_active?: boolean;
 }
 
 export interface Subscription {
-  id: string;
+  id: string | null;
   plan_name: string;
   billing_cycle: "monthly" | "yearly";
   status: "active" | "cancelled" | "past_due";
-  current_period_start: string;
-  current_period_end: string;
-  created_at: string;
+  current_period_start: string | null;
+  current_period_end: string | null;
+  cancelled_at: string | null;
+  created_at: string | null;
+  plan_details: SubscriptionPlan | null;
+  billing_mode: "stripe" | "demo";
 }
 
 export interface Transaction {
@@ -351,6 +383,7 @@ export interface AdminDashboard {
   active_subscriptions: number;
   total_revenue: number;
   tokens_generated_month: number;
+  total_conversations?: number;
   tier_distribution: Record<string, number>;
   recent_transactions: Transaction[];
 }

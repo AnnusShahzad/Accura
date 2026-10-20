@@ -1,0 +1,21 @@
+# =============================================================================
+# Accura – Production overrides
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# =============================================================================
+services:
+  postgres:
+    # Don't publish the database outside the compose network
+    ports: !reset []
+    restart: always
+
+  redis:
+    ports: !reset []
+    restart: always
+
+  backend:
+    # Run the code baked into the image, not a bind-mounted checkout
+    volumes: !reset []
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+    restart: always

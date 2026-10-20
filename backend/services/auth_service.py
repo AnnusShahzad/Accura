@@ -5,10 +5,10 @@ Handles registration, login, JWT token generation, password hashing, OTP verific
 
 from __future__ import annotations
 
+import hashlib
 import logging
-import random
 import re
-import string
+import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -28,6 +28,14 @@ _JWT_ALGORITHM: str = settings.get("jwt.algorithm", "HS256")
 _ACCESS_EXPIRE: int = settings.get("jwt.access_token_expire_minutes", 30)
 _REFRESH_EXPIRE: int = settings.get("jwt.refresh_token_expire_days", 30)
 _OTP_EXPIRE_MINUTES: int = 60
+_RESET_EXPIRE_MINUTES: int = 30
+_EMAIL_CHANGE_EXPIRE_MINUTES: int = 60
+
+
+def _log_otp(email: str, otp_code: str) -> None:
+    """Log OTP codes only in debug mode so they never leak into prod logs."""
+    if settings.get("app.debug", False):
+        logger.info("OTP for %s: %s (debug mode only)", email, otp_code)
 
 
 # ---------------------------------------------------------------------------
@@ -79,19 +87,21 @@ def validate_username(username: str) -> None:
 
 def generate_otp() -> str:
     """Generate a 6-digit OTP code."""
-    return "".join(random.choices(string.digits, k=6))
+    return f"{secrets.randbelow(1_000_000):06d}"
 
 
 # ---------------------------------------------------------------------------
 # JWT helpers
 # ---------------------------------------------------------------------------
 
-def create_access_token(user_id: str, extra: dict | None = None) -> str:
+def create_access_token(
+    user_id: str, extra: dict | None = None, expire_minutes: int | None = None
+) -> str:
     now = datetime.now(timezone.utc)
     payload = {
         "sub": user_id,
         "iat": now,
-        "exp": now + timedelta(minutes=_ACCESS_EXPIRE),
+        "exp": now + timedelta(minutes=expire_minutes or _ACCESS_EXPIRE),
         "type": "access",
         **(extra or {}),
     }
@@ -153,7 +163,7 @@ async def register_user(
             
             # Send OTP email
             try:
-                logger.info("Generated NEW OTP for unverified user %s: %s", email, otp_code)
+                _log_otp(email, otp_code)
                 await send_email(
                     to=email,
                     subject="Your Accura Verification Code",
@@ -221,7 +231,7 @@ async def register_user(
 
     # Send OTP verification email
     try:
-        logger.info("Generated OTP for %s: %s (Logging for local dev/testing)", email, otp_code)
+        _log_otp(email, otp_code)
         await send_email(
             to=email,
             subject="Your Accura Verification Code",
@@ -266,7 +276,7 @@ async def login_user(email: str, password: str) -> dict:
         }).where(User.id == user["id"]).run()
         
         try:
-            logger.info("Auto-resending OTP for login attempt by unverified user %s: %s", email, otp_code)
+            _log_otp(email, otp_code)
             await send_email(
                 to=email,
                 subject="Your Accura Verification Code",
@@ -337,35 +347,53 @@ async def verify_email(token: str) -> bool:
     return True
 
 # ---------------------------------------------------------------------------
-# Request password fun
+# Password reset
 # ---------------------------------------------------------------------------
 
-async def request_password_reset(email: str) -> bool:
+def _password_fingerprint(hashed_password: str) -> str:
+    """Short digest of the current hash; changes whenever the password does.
 
+    Embedding it in reset tokens makes each link single-use: once the
+    password is reset, every previously issued link stops validating.
+    """
+    return hashlib.sha256(hashed_password.encode("utf-8")).hexdigest()[:16]
+
+
+async def request_password_reset(email: str) -> bool:
     user = await User.select().where(User.email == email).first().run()
 
     # Security: don't reveal if email exists
     if not user:
         return True
 
-    user_id = str(user["id"])
-
     reset_token = create_access_token(
-        user_id,
-        extra={"type": "password_reset"}
-    )
-
-    reset_url = f"{settings.get('app.frontend_url','')}/reset-password?token={reset_token}"
-
-    await send_email(
-        to=user["email"],
-        subject="Reset your Accura password",
-        template_name="reset_password.html",
-        template_context={
-            "username": user["username"],
-            "reset_url": reset_url,
+        str(user["id"]),
+        extra={
+            "type": "password_reset",
+            "pwd": _password_fingerprint(user["hashed_password"]),
         },
+        expire_minutes=_RESET_EXPIRE_MINUTES,
     )
+
+    reset_url = f"{settings.get('app.frontend_url', '')}/reset-password?token={reset_token}"
+
+    try:
+        await send_email(
+            to=user["email"],
+            subject="Reset your Accura password",
+            template_name="reset_password.html",
+            template_context={
+                "username": user["username"],
+                "reset_url": reset_url,
+                "expire_minutes": _RESET_EXPIRE_MINUTES,
+            },
+        )
+    except Exception as e:
+        # Still answer generically so the endpoint can't be used to probe
+        # which addresses are registered.
+        logger.warning("Password reset email could not be sent to %s: %s", email, e)
+        if settings.get("app.debug", False):
+            logger.info("Password reset link for %s: %s (debug mode only)", email, reset_url)
 
     return True
 
@@ -427,7 +455,7 @@ async def resend_otp(email: str) -> bool:
     }).where(User.id == user["id"]).run()
 
     try:
-        logger.info("Generated OTP for %s: %s (Logging for local dev/testing)", email, otp_code)
+        _log_otp(email, otp_code)
         await send_email(
             to=email,
             subject="Your Accura Verification Code",
@@ -482,84 +510,92 @@ async def change_password(user_id: str, old_password: str, new_password: str) ->
     validate_password(new_password)
 
     hashed = hash_password(new_password)
-    await User.update({User.hashed_password: hashed}).where(User.id == user_id).run()
+    await User.update({
+        User.hashed_password: hashed,
+        User.updated_at: datetime.now(timezone.utc),
+    }).where(User.id == user_id).run()
     return True
 
 # ---------------------------------------------------------------------------
-# Reset password fun
+# Reset password
 # ---------------------------------------------------------------------------
 
 async def reset_password(token: str, new_password: str) -> bool:
-
     payload = decode_token(token)
-
     if payload.get("type") != "password_reset":
         raise AuthenticationError("Invalid reset token")
 
-    user_id = payload["sub"]
+    user = await User.select().where(User.id == payload["sub"]).first().run()
+    if not user or payload.get("pwd") != _password_fingerprint(user["hashed_password"]):
+        raise AuthenticationError("This reset link has already been used or is invalid")
 
-    hashed = hash_password(new_password)
+    validate_password(new_password)
 
-    await User.update(
-        {User.hashed_password: hashed}
-    ).where(
-        User.id == user_id
-    ).run()
-
+    await User.update({
+        User.hashed_password: hash_password(new_password),
+        User.updated_at: datetime.now(timezone.utc),
+    }).where(User.id == user["id"]).run()
     return True
 
-async def request_email_change(user_id: str, new_email: str) -> bool:
-    from models.user import User
-    from utils.email import send_email
-    from config import settings
 
-    existing = await User.select().where(User.email == new_email).first().run()
+# ---------------------------------------------------------------------------
+# Email change
+# ---------------------------------------------------------------------------
+
+async def request_email_change(user_id: str, new_email: str) -> bool:
+    new_email = new_email.strip().lower()
+    existing = await User.select(User.id).where(User.email == new_email).first().run()
     if existing:
         raise ValidationError("Email already in use")
 
+    user = await User.select().where(User.id == user_id).first().run()
+    if not user:
+        raise AuthenticationError("User not found")
+
     token = create_access_token(
         user_id,
-        extra={
-            "type": "email_change",
-            "new_email": new_email,
-        },
+        extra={"type": "email_change", "new_email": new_email},
+        expire_minutes=_EMAIL_CHANGE_EXPIRE_MINUTES,
     )
+    verify_url = f"{settings.get('app.frontend_url', '')}/email-change?token={token}"
 
-    verify_url = f"{settings.get('app.frontend_url','')}/email-change?token={token}"
-
-    user = await User.select().where(User.id == user_id).first().run()
-
-    await send_email(
-        to=new_email,
-        subject="Confirm your new email",
-        template_name="verify_email.html",
-        template_context={
-            "username": user["username"],
-            "verification_url": verify_url,
-        },
-    )
+    try:
+        await send_email(
+            to=new_email,
+            subject="Confirm your new email",
+            template_name="verify_email.html",
+            template_context={
+                "username": user["username"],
+                "verification_url": verify_url,
+            },
+        )
+    except Exception as e:
+        logger.warning("Email change confirmation could not be sent to %s: %s", new_email, e)
+        raise ValidationError("Failed to send confirmation email. Check SMTP settings.", status_code=500)
 
     return True
 
-async def confirm_email_change(token: str) -> bool:
 
+async def confirm_email_change(token: str) -> str:
     payload = decode_token(token)
-
-    print("TOKEN PAYLOAD:", payload)
-
-    if payload.get("type") != "email_change":
+    if payload.get("type") != "email_change" or not payload.get("new_email"):
         raise AuthenticationError("Invalid email change token")
 
     user_id = payload["sub"]
     new_email = payload["new_email"]
 
-    print("Updating user:", user_id)
-    print("New email:", new_email)
+    # The address may have been claimed between request and confirmation.
+    taken = await User.select(User.id).where(
+        (User.email == new_email) & (User.id != user_id)
+    ).first().run()
+    if taken:
+        raise AuthenticationError("That email address is already in use")
 
-    await User.update(
-        {User.email: new_email}
-    ).where(
-        User.id == user_id
-    ).run()
+    await User.update({
+        User.email: new_email,
+        User.is_verified: True,
+        User.updated_at: datetime.now(timezone.utc),
+    }).where(User.id == user_id).run()
 
-    print("EMAIL UPDATED")
+    logger.info("User %s changed email to %s", user_id, new_email)
+    return new_email

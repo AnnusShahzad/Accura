@@ -113,8 +113,13 @@ export default function RegisterPage() {
   }, [username, checkUsername]);
 
   const onSubmit = async (data: RegisterFormData) => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- strip before sending
     const { confirmPassword: _, ...payload } = data;
-    await registerUser(payload);
+    try {
+      await registerUser(payload);
+    } catch {
+      // onError in the mutation already shows a toast
+    }
   };
 
   return (

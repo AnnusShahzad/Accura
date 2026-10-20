@@ -33,7 +33,11 @@ export default function LoginPage() {
   });
 
   const onSubmit = async (data: LoginFormData) => {
-    await login(data);
+    try {
+      await login(data);
+    } catch {
+      // onError in the mutation already shows a toast
+    }
   };
 
   return (

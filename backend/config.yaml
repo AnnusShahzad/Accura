@@ -10,10 +10,12 @@ app:
   environment: "production"
   host: "0.0.0.0"
   port: 8000
-  workers: 4
+  # >1 requires Redis for consistent rate limiting
+  workers: 1
   debug: false
-  app:
-  frontend_url: http://localhost:3000
+  frontend_url: "http://localhost:3000"
+  # Comma-separated list of origins allowed to call the API ("*" = any)
+  cors_origins: "*"
 
 branding:
   company_name: "Accura"
@@ -21,6 +23,10 @@ branding:
   support_email: "support@accura.ai"
 
 database:
+  # "sqlite" for zero-setup local development, "postgres" for Docker /
+  # production deployments.
+  engine: "sqlite"
+  sqlite_path: "accura_dev.db"
   host: "postgres"
   port: 5432
   name: "accura"
@@ -29,7 +35,8 @@ database:
   pool_size: 20
 
 redis:
-  url: "redis://redis:6379/0"
+  # Leave empty to use the in-process rate limiter (single worker only).
+  url: ""
 
 jwt:
   secret: "change-me-in-production"
@@ -57,6 +64,16 @@ ai:
     deepseek:
       api_key: ""
       base_url: "https://api.deepseek.com/v1"
+    anthropic:
+      api_key: ""
+      base_url: "https://api.anthropic.com/v1/"
+    google:
+      api_key: ""
+      base_url: "https://generativelanguage.googleapis.com/v1beta/openai/"
+    # Any OpenAI-compatible endpoint (vLLM, Ollama, OpenRouter, NVIDIA NIM...)
+    custom:
+      api_key: ""
+      base_url: ""
 
   system_prompts:
     generator: |
@@ -69,6 +86,9 @@ ai:
       You are a prompt engineer. The previous response scored below the threshold.
       Rephrase the following user prompt to elicit a better response from the AI.
       Keep the original intent but improve clarity and specificity.
+
+  # Maximum MCP tool-call rounds per generation
+  max_tool_rounds: 5
 
 evaluation:
   global_threshold: 75
@@ -117,6 +137,21 @@ subscriptions:
       - "MCP server integration"
       - "Custom branding"
       - "SSO integration"
+
+security:
+  # Fernet key used to encrypt BYOK API keys at rest. REQUIRED.
+  encryption_key: ""
+
+billing:
+  # When stripe_secret_key is empty the platform runs in demo billing mode:
+  # upgrades take effect immediately and no card is charged.
+  stripe_secret_key: ""
+  stripe_webhook_secret: ""
+  stripe_price_ids:
+    pro_monthly: ""
+    pro_yearly: ""
+  # How often (seconds) the renewal job checks for expired periods
+  renewal_check_interval: 3600
 
 search:
   enabled: true

@@ -59,11 +59,11 @@ export default function ProfilePage() {
 
     try {
       await userApi.requestEmailChange({ email: newEmail });
-      toast.success("Verification email sent");
+      toast.success(`Confirmation link sent to ${newEmail}. Open it to finish the change.`);
       setShowEmailChange(false);
       setNewEmail("");
-    } catch {
-      toast.error("Failed to change email");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to change email");
     }
   };
 
@@ -118,8 +118,8 @@ export default function ProfilePage() {
       const res = await userApi.updateProfile(data);
       setUser(res.data.user, res.data.profile);
       toast.success("Profile updated");
-    } catch {
-      toast.error("Failed to update profile");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update profile");
     } finally {
       setIsSavingProfile(false);
     }
@@ -234,7 +234,7 @@ export default function ProfilePage() {
               onSubmit={profileForm.handleSubmit(onSaveProfile)}
               className="space-y-4"
             >
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <FormField
                   control={profileForm.control}
                   name="first_name"
@@ -264,7 +264,7 @@ export default function ProfilePage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <FormField
                   control={profileForm.control}
                   name="phone"

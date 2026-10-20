@@ -51,7 +51,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FileText, Plus, Pencil, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -80,7 +79,7 @@ export default function AdminPromptsPage() {
       setIsDialogOpen(false);
       setEditing(null);
     },
-    onError: () => toast.error("Failed to save prompt"),
+    onError: (e: Error) => toast.error(e.message || "Failed to save prompt"),
   });
 
   const deleteMutation = useMutation({

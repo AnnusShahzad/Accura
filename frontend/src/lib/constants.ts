@@ -10,28 +10,42 @@ export const TIERS = {
 } as const;
 
 // ─── AI Models ───
+// `provider` selects which API key is used (platform key or your own
+// BYOK key for that provider). Any OpenAI-compatible model can also be
+// used through the "custom" provider with your own base URL.
 export const AI_MODELS = [
-  { value: "gpt-5.2", label: "GPT 5.2", provider: "openai" },
-  { value: "gpt-5.1", label: "GPT 5.1", provider: "openai" },
-  { value: "deepseek-v3", label: "DeepSeek V3", provider: "deepseek" },
-  { value: "deepseek-ai/deepseek-v3.2", label: "DeepSeek V3.2", provider: "deepseek" },
-  { value: "minimaxai/minimax-m2.5", label: "Minimax M2.5", provider: "minimax" },
-  { value: "openai/gpt-oss-120b", label: "ChatGPT 120B OSS", provider: "openai" }
+  { value: "gpt-5.2", label: "GPT-5.2", provider: "openai" },
+  { value: "gpt-5.1", label: "GPT-5.1", provider: "openai" },
+  { value: "gpt-5-mini", label: "GPT-5 mini", provider: "openai" },
+  { value: "gpt-4o", label: "GPT-4o", provider: "openai" },
+  { value: "deepseek-chat", label: "DeepSeek V3 (chat)", provider: "deepseek" },
+  { value: "deepseek-reasoner", label: "DeepSeek R1 (reasoner)", provider: "deepseek" },
+  { value: "claude-opus-5-5", label: "Claude Opus 5.5", provider: "anthropic" },
+  { value: "claude-sonnet-5-5", label: "Claude Sonnet 5.5", provider: "anthropic" },
+  { value: "claude-haiku-5-5", label: "Claude Haiku 5.5", provider: "anthropic" },
+  { value: "gemini-2.5-pro", label: "Gemini 2.5 Pro", provider: "google" },
+  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash", provider: "google" },
+  { value: "openai/gpt-oss-120b", label: "GPT-OSS 120B (custom endpoint)", provider: "custom" },
+  { value: "openai/gpt-oss-20b", label: "GPT-OSS 20B (custom endpoint)", provider: "custom" },
 ] as const;
+
+export function providerForModel(model: string | undefined): string {
+  return AI_MODELS.find((m) => m.value === model)?.provider ?? "openai";
+}
 
 // ─── AI Providers ───
 export const AI_PROVIDERS = [
   { value: "openai", label: "OpenAI" },
   { value: "deepseek", label: "DeepSeek" },
   { value: "anthropic", label: "Anthropic" },
-  { value: "custom", label: "Custom" },
+  { value: "google", label: "Google AI" },
+  { value: "custom", label: "Custom (OpenAI-compatible)" },
 ] as const;
 
 // ─── MCP Transport Options ───
 export const MCP_TRANSPORTS = [
-  { value: "sse", label: "SSE (Server-Sent Events)" },
-  { value: "stdio", label: "Stdio" },
-  { value: "http", label: "HTTP" },
+  { value: "http", label: "Streamable HTTP" },
+  { value: "sse", label: "SSE (legacy)" },
 ] as const;
 
 // ─── Notification Channels ───
@@ -50,8 +64,9 @@ export const BILLING_CYCLES = [
 
 // ─── Conversation Statuses ───
 export const CONVERSATION_STATUSES = {
-  active: "Active",
+  active: "Generating",
   completed: "Completed",
+  failed: "Failed",
   archived: "Archived",
 } as const;
 

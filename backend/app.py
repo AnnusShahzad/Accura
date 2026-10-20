@@ -5,12 +5,14 @@ Accura – Main Application Entry Point
 from __future__ import annotations
 
 import logging
-import os
 
+from piccolo.engine.sqlite import SQLiteEngine
 from sanic import Sanic, json as sanic_json
 from sanic.request import Request
 
 from config import settings
+from models.chat import Conversation
+from utils.db_schema import ensure_schema
 from middleware.auth_middleware import auth_middleware
 from middleware.rate_limiter import rate_limit_middleware
 from routes.admin import bp as admin_bp
@@ -33,6 +35,34 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger("accura")
+# Library chatter that drowns out our own logs in debug mode
+for _name in ("aiosqlite", "asyncio", "httpcore", "httpx", "openai", "hpack"):
+    logging.getLogger(_name).setLevel(logging.INFO if _name == "httpx" else logging.WARNING)
+
+
+def _dedupe_sanic_logs() -> None:
+    # Sanic attaches its own handlers (and re-applies its logging config
+    # when the app is created); without this every Sanic line is printed
+    # twice, once by Sanic and once by the root handler above.
+    for name in ("sanic.root", "sanic.error", "sanic.access", "sanic.server", "sanic.websockets"):
+        logging.getLogger(name).propagate = False
+
+_INSECURE_SECRETS = {"", "changeme", "change-me-in-production", "change-me-to-a-secure-random-string"}
+
+
+def _check_secrets() -> None:
+    """Refuse to boot in production with placeholder secrets."""
+    problems = []
+    if str(settings.get("jwt.secret", "")) in _INSECURE_SECRETS:
+        problems.append("JWT_SECRET is unset or a placeholder")
+    if not settings.get("security.encryption_key"):
+        problems.append("ENCRYPTION_KEY is unset (saving API keys will fail)")
+    if not problems:
+        return
+    if str(settings.get("app.environment", "")).lower() == "production" and not settings.get("app.debug"):
+        raise RuntimeError("Insecure configuration: " + "; ".join(problems))
+    for problem in problems:
+        logger.warning("Insecure configuration: %s", problem)
 
 # ---------------------------------------------------------------------------
 # App factory
@@ -40,26 +70,19 @@ logger = logging.getLogger("accura")
 
 
 def create_app() -> Sanic:
-    app = Sanic("Accura")
+    # strict_slashes=False: "/api/v1/chat" and "/api/v1/chat/" are the same route
+    app = Sanic("Accura", strict_slashes=False)
 
-    # --- Configuration ---
+    # --- Configuration / CORS (handled by sanic-ext, incl. preflight) ---
+    origins = str(settings.get("app.cors_origins", "*") or "*")
     app.config.update({
-        "CORS_ORIGINS": "*",
+        "CORS_ORIGINS": origins if origins == "*" else [o.strip() for o in origins.split(",") if o.strip()],
         "CORS_METHODS": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        "CORS_HEADERS": ["Authorization", "Content-Type"],
+        "CORS_ALLOW_HEADERS": ["Authorization", "Content-Type", "Stripe-Signature"],
+        "CORS_MAX_AGE": 600,
         "FALLBACK_ERROR_FORMAT": "json",
+        "OAS_UI_DEFAULT": "swagger",
     })
-
-    # --- CORS ---
-    @app.options("/<path:path>")
-    async def cors_preflight(request: Request, path: str):
-        return sanic_json("", status=204)
-
-    @app.middleware("response")
-    async def add_cors_headers(request: Request, response):
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Methods"] = "GET,POST,PUT,PATCH,DELETE,OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "Authorization,Content-Type"
 
     # --- Middleware ---
     app.register_middleware(auth_middleware, "request")
@@ -102,51 +125,49 @@ def create_app() -> Sanic:
     @app.before_server_start
     async def startup(app_instance):
         logger.info("Accura backend starting – %s", settings.get("app.environment"))
-        await _create_tables()
+        _check_secrets()
+        engine = Conversation._meta.db
+        if not isinstance(engine, SQLiteEngine) and getattr(engine, "pool", None) is None:
+            await engine.start_connection_pool()
+        await ensure_schema()
         await _seed_subscription_plans()
+        from routes.admin import apply_admin_config
 
+        await apply_admin_config()
+
+    @app.after_server_start
+    async def start_background_jobs(app_instance):
+        app_instance.add_task(_renewal_loop(), name="subscription-renewals")
+
+    @app.before_server_stop
+    async def stop_background_jobs(app_instance):
+        await app_instance.cancel_task("subscription-renewals", raise_exception=False)
+
+    @app.after_server_stop
+    async def shutdown(app_instance):
+        engine = Conversation._meta.db
+        # The ASGI test client runs the server lifecycle around every
+        # request; it sets keep_db_pool so background tasks keep working.
+        if not isinstance(engine, SQLiteEngine) and not getattr(app_instance.ctx, "keep_db_pool", False):
+            await engine.close_connection_pool()
+
+    _dedupe_sanic_logs()
     return app
 
 
-async def _create_tables():
-    """Create all database tables if they don't exist (dev / SQLite)."""
-    from models.user import User, UserProfile
-    from models.subscription import SubscriptionPlan, Subscription, Transaction
-    from models.chat import Conversation, ChatAgent, Iteration, ChatMessage
-    from models.settings import UserSettings
-    from models.mcp_server import MCPServer
-    from models.notification import Notification, NotificationPreference
-    from models.admin import AdminConfig, SystemPrompt, DomainRule
-    from models.api_key import UserAPIKey
-    from models.contact import ContactRequest
+async def _renewal_loop():
+    """Periodically roll over subscriptions whose billing period ended."""
+    import asyncio
 
-    tables = [
-        User,
-        UserProfile,
-        SubscriptionPlan,
-        Subscription,
-        Transaction,
-        Conversation,
-        ChatAgent,
-        Iteration,
-        ChatMessage,
-        UserSettings,
-        MCPServer,
-        Notification,
-        NotificationPreference,
-        AdminConfig,
-        SystemPrompt,
-        DomainRule,
-        UserAPIKey,
-        ContactRequest,
-    ]
+    from services.billing_service import renew_due_subscriptions
 
-    for table_cls in tables:
+    interval = max(60, int(settings.get("billing.renewal_check_interval", 3600)))
+    while True:
         try:
-            await table_cls.create_table(if_not_exists=True).run()
-        except Exception as exc:
-            logger.warning("Table creation note (%s): %s", table_cls.__name__, exc)
-    logger.info("Database tables ensured.")
+            await renew_due_subscriptions()
+        except Exception:
+            logger.exception("Subscription renewal job failed")
+        await asyncio.sleep(interval)
 
 
 async def _seed_subscription_plans():
@@ -187,9 +208,11 @@ async def _seed_subscription_plans():
 app = create_app()
 
 if __name__ == "__main__":
+    workers = max(1, int(settings.get("app.workers", 1)))
     app.run(
         host=settings.get("app.host", "0.0.0.0"),
-        port=settings.get("app.port", 8000),
-        debug=settings.get("app.debug", True),
-        single_process=True,
+        port=int(settings.get("app.port", 8000)),
+        debug=bool(settings.get("app.debug", False)),
+        workers=workers,
+        single_process=workers == 1,
     )

@@ -9,7 +9,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import {
@@ -55,16 +54,20 @@ export default function AdminContactsPage() {
       reply,
     }: {
       id: string;
-      status: string;
+      status: "resolved" | "open";
       reply?: string;
     }) => adminApi.updateContactRequest(id, { status, reply }),
-    onSuccess: () => {
+    onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["admin", "contacts"] });
-      toast.success("Updated");
+      toast.success(res.message || "Updated");
       setSelected(null);
       setReplyText("");
     },
-    onError: () => toast.error("Failed to update"),
+    onError: (e: Error) => {
+      // The status may already be saved even if the reply email failed
+      queryClient.invalidateQueries({ queryKey: ["admin", "contacts"] });
+      toast.error(e.message || "Failed to update");
+    },
   });
 
   const contacts = data?.data?.items || [];
@@ -222,6 +225,21 @@ export default function AdminContactsPage() {
             <Button variant="outline" onClick={() => setSelected(null)}>
               Close
             </Button>
+            {selected && !replyText && (
+              <Button
+                variant="secondary"
+                onClick={() =>
+                  updateStatus.mutate({
+                    id: selected.id,
+                    status: selected.is_resolved ? "open" : "resolved",
+                  })
+                }
+                disabled={updateStatus.isPending}
+              >
+                {updateStatus.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {selected.is_resolved ? "Reopen" : "Mark Resolved"}
+              </Button>
+            )}
             {selected && replyText && (
               <Button
                 onClick={() =>
@@ -238,7 +256,7 @@ export default function AdminContactsPage() {
                 ) : (
                   <MessageSquare className="mr-2 h-4 w-4" />
                 )}
-                Send Reply
+                Send Reply &amp; Resolve
               </Button>
             )}
           </DialogFooter>

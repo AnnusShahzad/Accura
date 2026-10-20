@@ -1,0 +1,14 @@
+# Never bake local environments, secrets or databases into the image
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+*.db
+*.db-journal
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+tests/

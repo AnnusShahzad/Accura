@@ -11,12 +11,13 @@ from piccolo.columns import (
     JSONB,
 )
 from piccolo.columns.defaults.timestamptz import TimestamptzNow
-from piccolo.table import Table
+
+from models.base import JSONTable
 
 from models.user import User
 
 
-class MCPServer(Table, tablename="mcp_servers"):
+class MCPServer(JSONTable, tablename="mcp_servers"):
     """User-level or global MCP server configuration."""
 
     id = UUID(primary_key=True)
@@ -27,7 +28,7 @@ class MCPServer(Table, tablename="mcp_servers"):
     description = Text(default="")
     is_active = Boolean(default=True)
     is_global = Boolean(default=False)
-    transport = Varchar(length=20, default="sse")  # sse | stdio | http
+    transport = Varchar(length=20, default="http")  # http (Streamable HTTP) | sse (legacy)
     headers = JSONB(default={})
     metadata = JSONB(default={})
     created_at = Timestamptz(default=TimestamptzNow())

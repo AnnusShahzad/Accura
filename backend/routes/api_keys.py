@@ -9,6 +9,7 @@ DELETE /api/v1/api-keys/<id>
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timezone
 
 from sanic import Blueprint, Request
 
@@ -16,7 +17,7 @@ from middleware.auth_middleware import require_auth
 from models.api_key import UserAPIKey
 from schemas.api_key import CreateAPIKeyRequest, UpdateAPIKeyRequest
 from utils.crypto import encrypt, decrypt
-from utils.responses import error, success
+from utils.responses import error, success, validation_error
 
 bp = Blueprint("api_keys", url_prefix="/api/v1/api-keys")
 
@@ -36,9 +37,9 @@ def _key_preview(encrypted: str) -> str:
 @require_auth
 async def create_api_key(request: Request):
     try:
-        body = CreateAPIKeyRequest(**request.json)
+        body = CreateAPIKeyRequest(**(request.json or {}))
     except Exception as exc:
-        return error(str(exc), status=422)
+        return validation_error(exc)
 
     user_id = str(request.ctx.user["id"])
     key_id = str(uuid.uuid4())
@@ -60,7 +61,9 @@ async def create_api_key(request: Request):
             "provider": body.provider,
             "label": body.label,
             "base_url": body.base_url,
+            "is_active": True,
             "key_preview": body.api_key[:4] + "..." + body.api_key[-4:] if len(body.api_key) > 8 else "****",
+            "created_at": datetime.now(timezone.utc).isoformat(),
         },
         message="API key added",
         status=201,
@@ -95,9 +98,9 @@ async def list_api_keys(request: Request):
 @require_auth
 async def update_api_key(request: Request, key_id: str):
     try:
-        body = UpdateAPIKeyRequest(**request.json)
+        body = UpdateAPIKeyRequest(**(request.json or {}))
     except Exception as exc:
-        return error(str(exc), status=422)
+        return validation_error(exc)
 
     user_id = str(request.ctx.user["id"])
 
@@ -112,6 +115,7 @@ async def update_api_key(request: Request, key_id: str):
         updates["key_encrypted"] = encrypt(updates.pop("api_key"))
 
     if updates:
+        updates["updated_at"] = datetime.now(timezone.utc)
         await UserAPIKey.update(updates).where(UserAPIKey.id == key_id).run()
 
     return success(message="API key updated")
@@ -122,8 +126,11 @@ async def update_api_key(request: Request, key_id: str):
 async def delete_api_key(request: Request, key_id: str):
     user_id = str(request.ctx.user["id"])
 
-    await UserAPIKey.delete().where(
+    existing = await UserAPIKey.select(UserAPIKey.id).where(
         (UserAPIKey.id == key_id) & (UserAPIKey.user == user_id)
-    ).run()
+    ).first().run()
+    if not existing:
+        return error("API key not found", status=404)
 
+    await UserAPIKey.delete().where(UserAPIKey.id == key_id).run()
     return success(message="API key deleted")

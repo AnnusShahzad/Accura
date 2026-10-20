@@ -13,7 +13,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
+import { useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { useAuthStore } from "@/stores/auth-store";
 import {
@@ -60,6 +62,12 @@ export function AppSidebar() {
   const pathname = usePathname();
   const { user } = useAuthStore();
   const { logout } = useAuth();
+  const { setOpenMobile } = useSidebar();
+
+  // On phones the sidebar is a drawer; close it once a link navigates
+  useEffect(() => {
+    setOpenMobile(false);
+  }, [pathname, setOpenMobile]);
 
   return (
     <Sidebar>

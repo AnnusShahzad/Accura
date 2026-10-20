@@ -1,7 +1,6 @@
 "use client";
 
 import { useForm } from "react-hook-form";
-import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { settingsSchema, type SettingsFormData } from "@/lib/validations";
 import { useSettings, useUpdateSettings } from "@/hooks/use-settings";
@@ -42,7 +41,6 @@ export default function SettingsPage() {
   const { data: settings, isLoading } = useSettings();
   const { setTheme } = useTheme();
   const updateSettings = useUpdateSettings();
-  const [formReady, setFormReady] = useState(false);
 
   const form = useForm<SettingsFormData>({
     resolver: zodResolver(settingsSchema),
@@ -60,9 +58,9 @@ export default function SettingsPage() {
   });
 
   useEffect(() => {
-    if (settings == undefined) return;
+    if (!settings) return;
     form.reset({
-      global_threshold: settings.global_threshold,
+      global_threshold: Number(settings.global_threshold),
       max_iterations: settings.max_iterations,
       timeout_seconds: settings.timeout_seconds,
       hide_evaluator_scoring: settings.hide_evaluator_scoring,
@@ -72,7 +70,6 @@ export default function SettingsPage() {
       dark_mode: settings?.dark_mode,
       search_enabled: settings?.search_enabled,
     });
-    setFormReady(true);
   }, [settings, form]);
 
   const onSubmit = (data: SettingsFormData) => {
@@ -80,7 +77,7 @@ export default function SettingsPage() {
     updateSettings.mutate(data);
   };
 
-  if (isLoading || !formReady) {
+  if (isLoading || !settings) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-8 w-48" />
@@ -227,7 +224,7 @@ export default function SettingsPage() {
                       <FormLabel>Generator</FormLabel>
                       <Select
                         onValueChange={field.onChange}
-                        defaultValue={field.value}
+                        value={field.value}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -253,7 +250,7 @@ export default function SettingsPage() {
                       <FormLabel>Evaluator</FormLabel>
                       <Select
                         onValueChange={field.onChange}
-                        defaultValue={field.value}
+                        value={field.value}
                       >
                         <FormControl>
                           <SelectTrigger>

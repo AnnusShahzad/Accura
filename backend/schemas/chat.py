@@ -9,13 +9,17 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
+PROVIDER_PATTERN = "^(openai|deepseek|anthropic|google|custom)$"
+
+
 class CreateConversationRequest(BaseModel):
-    title: str = Field(default="New Conversation", max_length=500)
-    prompt: str = Field(min_length=1)
-    generator_model: str = Field(default="gpt-5.2")
-    generator_provider: str = Field(default="openai")
-    evaluator_model: Optional[str] = None
-    evaluator_provider: Optional[str] = None
+    title: str = Field(default="", max_length=500)
+    prompt: str = Field(min_length=1, max_length=100_000)
+    # Omitted models fall back to the user's preferred models
+    generator_model: Optional[str] = Field(None, min_length=1, max_length=100)
+    generator_provider: str = Field(default="openai", pattern=PROVIDER_PATTERN)
+    evaluator_model: Optional[str] = Field(None, min_length=1, max_length=100)
+    evaluator_provider: Optional[str] = Field(None, pattern=PROVIDER_PATTERN)
     search_enabled: bool = False
     is_temporary: bool = False
     threshold: Optional[float] = Field(None, ge=0, le=100)
@@ -29,15 +33,15 @@ class RenameConversationRequest(BaseModel):
 
 class FollowUpMessageRequest(BaseModel):
     """Send a follow-up message in an existing conversation."""
-    prompt: str = Field(min_length=1)
+    prompt: str = Field(min_length=1, max_length=100_000)
     search_enabled: Optional[bool] = None
 
 
 class AddAgentRequest(BaseModel):
-    """Add a new AI agent mid-conversation."""
-    provider: str
-    model: str
-    role: str = Field(default="generator")
+    """Add a new AI generator agent mid-conversation."""
+    provider: str = Field(pattern=PROVIDER_PATTERN)
+    model: str = Field(min_length=1, max_length=100)
+    role: str = Field(default="generator", pattern="^generator$")
 
 
 class ConversationResponse(BaseModel):

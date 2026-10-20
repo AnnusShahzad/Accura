@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { chatApi } from "@/lib/api-client";
+import { ApiError, chatApi } from "@/lib/api-client";
 import { useChatStore } from "@/stores/chat-store";
 import type {
   CreateConversationRequest,
@@ -20,6 +20,9 @@ export function useConversations(page = 1) {
       setConversations(res.data.items);
       return res.data;
     },
+    // Keep list badges fresh while something is still generating
+    refetchInterval: (query) =>
+      query.state.data?.items.some((c) => c.status === "active") ? 5000 : false,
   });
 }
 
@@ -31,9 +34,10 @@ export function useConversation(id: string) {
       return res.data;
     },
     enabled: !!id,
+    retry: (count, error) => !(error instanceof ApiError && error.status === 404) && count < 1,
     refetchInterval: (query) => {
       const data = query.state.data;
-      return data?.status === "active" ? 3000 : false;
+      return data?.status === "active" ? 2000 : false;
     },
   });
 }
@@ -54,7 +58,6 @@ export function useCreateConversation() {
       });
       selectConversation(res.data.id);
       queryClient.invalidateQueries({ queryKey: ["conversations"] });
-      toast.success("Conversation started!");
     },
     onError: (error: Error) => {
       toast.error(error.message || "Failed to create conversation");
@@ -94,7 +97,8 @@ export function useAddAgent() {
       chatApi.addAgent(id, data),
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ["conversation", id] });
-      toast.success("Agent added! Re-running generation...");
+      queryClient.invalidateQueries({ queryKey: ["conversation-messages", id] });
+      toast.success("Agent added – generating an alternative response");
     },
     onError: (error: Error) => {
       toast.error(error.message || "Failed to add agent");
@@ -110,6 +114,8 @@ export function useDeleteConversation() {
     mutationFn: (id: string) => chatApi.delete(id),
     onSuccess: (_, id) => {
       removeConversation(id);
+      queryClient.removeQueries({ queryKey: ["conversation", id] });
+      queryClient.removeQueries({ queryKey: ["conversation-messages", id] });
       queryClient.invalidateQueries({ queryKey: ["conversations"] });
       toast.success("Conversation deleted");
     },
@@ -130,7 +136,7 @@ export function useConversationIterations(id: string) {
   });
 }
 
-export function useConversationMessages(id: string) {
+export function useConversationMessages(id: string, isActive = false) {
   return useQuery({
     queryKey: ["conversation-messages", id],
     queryFn: async () => {
@@ -138,9 +144,25 @@ export function useConversationMessages(id: string) {
       return res.data;
     },
     enabled: !!id,
-    // Always poll when id is set; the conversation hook drives when to stop
-    refetchInterval: 3000,
+    // Poll only while a response is being generated
+    refetchInterval: isActive ? 2000 : false,
     staleTime: 0,
+  });
+}
+
+export function useRetryConversation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => chatApi.retry(id),
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: ["conversation", id] });
+      queryClient.invalidateQueries({ queryKey: ["conversation-messages", id] });
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to retry");
+    },
   });
 }
 
@@ -153,7 +175,6 @@ export function useSendFollowUpMessage() {
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ["conversation", id] });
       queryClient.invalidateQueries({ queryKey: ["conversation-messages", id] });
-      toast.success("Message sent!");
     },
     onError: (error: Error) => {
       toast.error(error.message || "Failed to send message");

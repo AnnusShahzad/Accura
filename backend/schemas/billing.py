@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 
 class CreateSubscriptionRequest(BaseModel):
-    plan_name: str  # basic | pro | business
+    plan_name: str = Field(pattern="^(basic|pro|business)$")
     billing_cycle: str = Field(default="monthly", pattern="^(monthly|yearly)$")
     payment_method_id: Optional[str] = None  # Stripe payment method
 

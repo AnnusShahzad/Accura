@@ -107,7 +107,7 @@ export default function ChatListPage() {
                 {/* Row 2: Title — clickable */}
                 <Link href={`/chat/${conv.id}`} className="block">
                   <p className="text-sm font-semibold line-clamp-2 leading-snug hover:text-primary transition-colors">
-                    {conv.title}
+                    {conv.title || "Untitled conversation"}
                   </p>
                 </Link>
 

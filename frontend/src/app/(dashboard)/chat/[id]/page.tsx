@@ -411,8 +411,10 @@ export default function ChatDetailPage({
             </div>
           ) : (
             <>
-              <h1 className="text-lg font-bold truncate max-w-xs">{conversation.title}</h1>
-              <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => { setRenameTitle(conversation.title); setIsRenaming(true); }}>
+              <h1 className={cn("text-lg font-bold truncate max-w-xs", !conversation.title && "text-muted-foreground")}>
+                {conversation.title || "Untitled conversation"}
+              </h1>
+              <Button variant="ghost" size="icon" aria-label="Rename conversation" className="h-7 w-7 shrink-0" onClick={() => { setRenameTitle(conversation.title); setIsRenaming(true); }}>
                 <Pencil className="h-3.5 w-3.5" />
               </Button>
             </>

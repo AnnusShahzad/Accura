@@ -249,6 +249,16 @@ async def _run_single_agent_loop(
 
 async def _mark_failed(conversation_id: str, user_id: str, reason: str) -> None:
     logger.error("Conversation %s failed: %s", conversation_id, reason)
+    # A failed first turn never reaches auto-titling; don't leave it blank
+    conv = await Conversation.select(Conversation.title, Conversation.prompt).where(
+        Conversation.id == conversation_id
+    ).first().run()
+    if conv and (conv["title"] or "") in ("", "New Conversation"):
+        from services.title_generator import fallback_title
+
+        await Conversation.update({Conversation.title: fallback_title(conv["prompt"])}).where(
+            Conversation.id == conversation_id
+        ).run()
     # Message first, status second (clients stop polling on the status)
     await ChatMessage.insert(
         ChatMessage(

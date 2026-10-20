@@ -60,6 +60,7 @@ async def test_provider_failure_marks_conversation_failed(test_client, auth_head
 
     assert conv["status"] == "failed"
     assert "No API key" in conv["metadata"]["error"]
+    assert conv["title"] == "Explain quantum computing in simple terms"
     assert conv["messages"][-1]["role"] == "system"
 
     # Fix the "key" and retry

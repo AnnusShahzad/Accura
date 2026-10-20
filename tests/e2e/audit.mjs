@@ -57,11 +57,28 @@ function layoutChecks(page, mobile) {
       }
       if (mobile && el.matches("button, a[href], [role=button], [role=combobox], [role=switch]") &&
           !el.closest("p, li")) {
-        // Switches extend their hit area with ::after; measure that too
+        // An absolutely positioned ::after enlarges the hit area: switches
+        // extend past their edges, stretched links cover their whole card.
+        // Measure the ::after box rather than the element's own rect.
         const after = getComputedStyle(el, "::after");
-        const extra = after.content !== "none" && after.position === "absolute"
-          ? Math.max(0, -parseFloat(after.top || "0")) * 2 : 0;
-        if (r.width < 24 || r.height + extra < 24) {
+        let hit = r;
+        if (after.content !== "none" && after.position === "absolute") {
+          // ::after is placed against the element itself if it's positioned,
+          // otherwise against its nearest positioned ancestor
+          const host = cs.position !== "static" ? el : el.offsetParent || el;
+          const hr = host.getBoundingClientRect();
+          const px = (v) => (v === "auto" ? null : parseFloat(v));
+          const [t, rt, b, l] = [px(after.top), px(after.right), px(after.bottom), px(after.left)];
+          if ([t, rt, b, l].every((v) => v !== null)) {
+            // The hit area is whichever box is larger (a decorative
+            // underline ::after doesn't shrink the button)
+            hit = {
+              width: Math.max(r.width, hr.width - l - rt),
+              height: Math.max(r.height, hr.height - t - b),
+            };
+          }
+        }
+        if (hit.width < 24 || hit.height < 24) {
           out.push(`small tap target ${Math.round(r.width)}x${Math.round(r.height)}: ${describe(el)}`);
         }
       }

@@ -146,7 +146,7 @@ export default function AdminUsersPage() {
                   <TableCell className="hidden sm:table-cell">
                     <div className="flex items-center gap-2">
                       {user.is_verified ? (
-                        <Badge className="bg-green-500/15 text-green-700 dark:text-green-400">
+                        <Badge className="bg-green-500/15 text-green-800 dark:text-green-400">
                           <CheckCircle className="mr-1 h-3 w-3" />
                           Verified
                         </Badge>

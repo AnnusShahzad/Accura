@@ -136,7 +136,7 @@ export default function ResetPasswordClient() {
           </>
         ) : (
           <>
-            <p className="text-green-700 dark:text-green-400 text-center font-semibold">
+            <p className="text-green-800 dark:text-green-400 text-center font-semibold">
               Password reset successful
             </p>
 

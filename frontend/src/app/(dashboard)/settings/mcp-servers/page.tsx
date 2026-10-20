@@ -141,7 +141,7 @@ export default function McpServersPage() {
               </Badge>
             )}
             {server.is_active ? (
-              <Badge className="bg-green-500/15 text-green-700 dark:text-green-400">Active</Badge>
+              <Badge className="bg-green-500/15 text-green-800 dark:text-green-400">Active</Badge>
             ) : (
               <Badge variant="outline">Disabled</Badge>
             )}

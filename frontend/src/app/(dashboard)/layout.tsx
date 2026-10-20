@@ -43,7 +43,13 @@ export default function DashboardLayout({
         <Header />
         <GuestBanner />
         {/* SidebarInset already renders <main>; a second one is invalid */}
-        <div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-6">{children}</div>
+        {/* Focusable so keyboard users can scroll pages without links */}
+        <div
+          tabIndex={0}
+          className="min-h-0 flex-1 overflow-y-auto p-4 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50 lg:p-6"
+        >
+          {children}
+        </div>
       </SidebarInset>
     </SidebarProvider>
   );

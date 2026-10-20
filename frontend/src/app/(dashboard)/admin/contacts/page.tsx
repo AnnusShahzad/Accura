@@ -75,7 +75,7 @@ export default function AdminContactsPage() {
   const statusColors: Record<string, string> = {
     new: "bg-blue-500/15 text-blue-700 dark:text-blue-400",
     in_progress: "bg-yellow-500/15 text-yellow-800 dark:text-yellow-300",
-    resolved: "bg-green-500/15 text-green-700 dark:text-green-400",
+    resolved: "bg-green-500/15 text-green-800 dark:text-green-400",
     closed: "bg-gray-500/15 text-gray-600",
   };
 

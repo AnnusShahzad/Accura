@@ -94,8 +94,12 @@ export default function NewChatPage() {
   }, [settings, form]);
 
   const onSubmit = async (data: CreateConversationFormData) => {
-    const result = await createConversation.mutateAsync(data);
-    router.push(`/chat/${result.data.id}`);
+    try {
+      const result = await createConversation.mutateAsync(data);
+      router.push(`/chat/${result.data.id}`);
+    } catch {
+      // onError in the mutation already shows a toast
+    }
   };
 
   // Preferred models saved in settings may not be in the built-in list

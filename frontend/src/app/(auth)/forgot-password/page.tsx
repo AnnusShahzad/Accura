@@ -39,7 +39,11 @@ export default function ForgotPasswordPage() {
   });
 
   const onSubmit = async (data: ForgotPasswordFormData) => {
-    await forgotPassword(data.email);
+    try {
+      await forgotPassword(data.email);
+    } catch {
+      // onError in the mutation already shows a toast
+    }
   };
 
   return (

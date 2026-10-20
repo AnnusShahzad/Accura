@@ -17,19 +17,20 @@ the repository root starts both.
 
 API location (both read at build time):
 
-- `NEXT_PUBLIC_API_URL` – call the API directly, e.g.
-  `https://your-api.onrender.com/api/v1`. Use this on Vercel.
+- `NEXT_PUBLIC_API_URL` – call an API on another host directly, e.g.
+  `https://api.example.com/api/v1` (the API's CORS settings must allow it).
 - otherwise the app calls its own `/api/v1`, which `next.config.ts`
-  proxies to `BACKEND_URL` (default `http://localhost:8000`).
+  proxies to `BACKEND_URL` (default `http://localhost:8000`). The
+  production image uses this mode, with the API in the same container.
 
-Deployment to Vercel or Render is described in [`../DEPLOYMENT.md`](../DEPLOYMENT.md).
+Deployment is described in [`../DEPLOYMENT.md`](../DEPLOYMENT.md).
 
 ## Scripts
 
 | Script | Description |
 |:--|:--|
 | `npm run dev` | Development server |
-| `npm run build` | Production build (`NEXT_PUBLIC_API_URL` is inlined at build time) |
+| `npm run build` | Production build (`NEXT_PUBLIC_API_URL`/`BACKEND_URL` are read at build time; `NEXT_OUTPUT=standalone` for the container) |
 | `npm run start` | Serve the production build |
 | `npm run lint` | ESLint (Next.js + React Compiler rules) |
 

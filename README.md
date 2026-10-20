@@ -114,9 +114,9 @@ Without SMTP configured, verification codes and reset links are printed to the b
 | `npm test` | Backend test suite |
 | `npm run dev:infra` / `stop:infra` | Start / stop PostgreSQL and Redis in Docker |
 
-## Free-tier deployment (Render + Vercel)
+## Free-tier deployment (Render)
 
-[`DEPLOYMENT.md`](DEPLOYMENT.md) walks through putting Accura online for free as a public demo: the API and a PostgreSQL database on Render (one-click via [`render.yaml`](render.yaml)), the frontend on Vercel or Render, registration closed and guest sessions that clean themselves up.
+[`DEPLOYMENT.md`](DEPLOYMENT.md) puts Accura online for free on Render alone: the frontend and API run as one web service from the root [`Dockerfile`](Dockerfile), with a free PostgreSQL database, set up in one click via [`render.yaml`](render.yaml). It's configured as a public demo, with registration closed and guest sessions that are deleted automatically.
 
 ## Docker (self-hosted)
 

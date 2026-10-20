@@ -20,7 +20,10 @@ function ScrollArea({
         data-slot="scroll-area-viewport"
         // Keyboard users scroll by focusing the viewport (it has focus styles)
         tabIndex={0}
-        className="size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1"
+        // Radix wraps the content in a display:table div, which grows to fit
+        // its widest child (e.g. a 520px markdown table) instead of the
+        // viewport, pushing whole chat bubbles off-screen on phones.
+        className="size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 [&>div]:!block"
       >
         {children}
       </ScrollAreaPrimitive.Viewport>

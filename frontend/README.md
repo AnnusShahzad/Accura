@@ -7,13 +7,22 @@ signed-in user in a small Zustand store.
 ## Setup
 
 ```bash
-cp .env.example .env.local   # NEXT_PUBLIC_API_URL, default http://localhost:8000/api/v1
+cp .env.example .env.local   # optional, see below
 npm install                  # or `npm install` at the repository root
 npm run dev                  # http://localhost:3000
 ```
 
 The backend must be running (see the repository README); `npm run dev` at
 the repository root starts both.
+
+API location (both read at build time):
+
+- `NEXT_PUBLIC_API_URL` – call the API directly, e.g.
+  `https://your-api.onrender.com/api/v1`. Use this on Vercel.
+- otherwise the app calls its own `/api/v1`, which `next.config.ts`
+  proxies to `BACKEND_URL` (default `http://localhost:8000`).
+
+Deployment to Vercel or Render is described in [`../DEPLOYMENT.md`](../DEPLOYMENT.md).
 
 ## Scripts
 

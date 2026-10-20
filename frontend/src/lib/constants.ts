@@ -1,6 +1,8 @@
 // ─── API Base ───
-export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+// Set NEXT_PUBLIC_API_URL to call the backend directly (e.g. from Vercel
+// to Render). Otherwise requests go to this app's own /api/v1, which
+// next.config.ts proxies to BACKEND_URL.
+export const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "/api/v1").replace(/\/+$/, "");
 
 // ─── Subscription Tiers ───
 export const TIERS = {

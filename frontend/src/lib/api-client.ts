@@ -45,6 +45,8 @@ import type {
   PlanUpdateRequest,
   User,
   ContactRequestItem,
+  PublicConfig,
+  GuestTokenResponse,
 } from "@/types";
 
 // ─── Token Management ───
@@ -71,9 +73,18 @@ function clearTokens() {
 // ─── Base Fetch ───
 // Auth endpoints answer 401 for bad credentials; those must surface as
 // errors, not trigger a token refresh and a redirect to /login.
-const NO_REFRESH_PATHS = ["/auth/login", "/auth/register", "/auth/refresh", "/auth/verify-otp", "/auth/resend-otp", "/auth/forgot-password", "/auth/reset-password", "/auth/verify-email-change"];
+const NO_REFRESH_PATHS = ["/auth/guest", "/auth/login", "/auth/register", "/auth/refresh", "/auth/verify-otp", "/auth/resend-otp", "/auth/forgot-password", "/auth/reset-password", "/auth/verify-email-change"];
+
+function reportUnreachable() {
+  // BackendStatus listens for this and shows a "waking up" banner
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("accura:api-unreachable"));
+  }
+}
 
 async function parseError(res: Response): Promise<ApiError> {
+  // Gateways answer 502/503/504 while a sleeping free-tier instance boots
+  if ([502, 503, 504].includes(res.status)) reportUnreachable();
   const err = await res.json().catch(() => ({}));
   return new ApiError(err.message || res.statusText || "Request failed", res.status, err.errors);
 }
@@ -99,6 +110,7 @@ async function apiFetch<T>(
     } catch (e) {
       // network error, e.g. backend not reachable
       const message = e instanceof Error ? e.message : "Failed to fetch";
+      reportUnreachable();
       throw new ApiError(
         `Cannot reach the Accura API (${message}). Is the backend running?`,
         0
@@ -115,7 +127,7 @@ async function apiFetch<T>(
     } else {
       clearTokens();
       if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
-        window.location.href = "/login";
+        window.location.href = "/login?reason=session-ended";
       }
       throw new ApiError("Session expired. Please log in again.", 401);
     }
@@ -258,8 +270,30 @@ export const authApi = {
     });
   },
 
+  guest() {
+    return apiFetch<ApiResponse<GuestTokenResponse>>("/auth/guest", {
+      method: "POST",
+    }).then((res) => {
+      setTokens(res.data.access_token, res.data.refresh_token);
+      return res;
+    });
+  },
+
   logout() {
     clearTokens();
+  },
+};
+
+// ═══════════════════════════════════════════════════════
+// PUBLIC
+// ═══════════════════════════════════════════════════════
+export const publicApi = {
+  getConfig() {
+    return apiFetch<ApiResponse<PublicConfig>>("/public/config");
+  },
+
+  health() {
+    return fetch(`${API_BASE_URL}/health`, { cache: "no-store" });
   },
 };
 

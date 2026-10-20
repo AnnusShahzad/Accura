@@ -224,7 +224,7 @@ export default function SettingsPage() {
                       <FormLabel>Generator</FormLabel>
                       <Select
                         onValueChange={field.onChange}
-                        defaultValue={field.value}
+                        value={field.value}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -250,7 +250,7 @@ export default function SettingsPage() {
                       <FormLabel>Evaluator</FormLabel>
                       <Select
                         onValueChange={field.onChange}
-                        defaultValue={field.value}
+                        value={field.value}
                       >
                         <FormControl>
                           <SelectTrigger>

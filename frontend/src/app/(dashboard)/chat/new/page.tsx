@@ -9,7 +9,9 @@ import {
 } from "@/lib/validations";
 import { useCreateConversation } from "@/hooks/use-chat";
 import { useSettings } from "@/hooks/use-settings";
-import { AI_MODELS, DEFAULTS, providerForModel } from "@/lib/constants";
+import { DEFAULTS } from "@/lib/constants";
+import { useModels } from "@/hooks/use-models";
+import Link from "next/link";
 import {
   Card,
   CardContent,
@@ -50,6 +52,10 @@ import { useRouter } from "next/navigation";
 export default function NewChatPage() {
   const router = useRouter();
   const { data: settings } = useSettings();
+  const { models, ready: modelsReady, providerOf, pick, defaults, searchAvailable, anyUsable } = useModels([
+    settings?.preferred_generator_model,
+    settings?.preferred_evaluator_model,
+  ]);
   const createConversation = useCreateConversation();
   const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -59,9 +65,9 @@ export default function NewChatPage() {
       prompt: "",
       title: "",
       generator_model: DEFAULTS.preferredGeneratorModel,
-      generator_provider: providerForModel(DEFAULTS.preferredGeneratorModel),
+      generator_provider: "openai",
       evaluator_model: DEFAULTS.preferredEvaluatorModel,
-      evaluator_provider: providerForModel(DEFAULTS.preferredEvaluatorModel),
+      evaluator_provider: "openai",
       search_enabled: false,
       is_temporary: false,
       threshold: DEFAULTS.globalThreshold,
@@ -73,25 +79,30 @@ export default function NewChatPage() {
   // defaultValues are captured on the first render, before the settings
   // query resolves; apply the user's preferences once they arrive without
   // clobbering anything already typed.
+  // A preferred model whose provider has no key here falls back to the
+  // server's default, so a fresh deployment works out of the box.
   useEffect(() => {
-    if (!settings) return;
-    const gen = settings.preferred_generator_model || DEFAULTS.preferredGeneratorModel;
-    const evalModel = settings.preferred_evaluator_model || DEFAULTS.preferredEvaluatorModel;
+    if (!settings || !modelsReady) return;
+    const gen = pick(settings.preferred_generator_model, defaults?.default_generator_model) ||
+      DEFAULTS.preferredGeneratorModel;
+    const evalModel = pick(settings.preferred_evaluator_model, defaults?.default_evaluator_model) ||
+      DEFAULTS.preferredEvaluatorModel;
     form.reset(
       {
         ...form.getValues(),
         generator_model: gen,
-        generator_provider: providerForModel(gen),
+        generator_provider: providerOf(gen),
         evaluator_model: evalModel,
-        evaluator_provider: providerForModel(evalModel),
-        search_enabled: settings.search_enabled,
+        evaluator_provider: providerOf(evalModel),
+        search_enabled: searchAvailable && settings.search_enabled,
         threshold: Number(settings.global_threshold),
         max_iterations: settings.max_iterations,
         timeout_seconds: settings.timeout_seconds,
       },
       { keepDirtyValues: true }
     );
-  }, [settings, form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- helpers are rebuilt each render
+  }, [settings, modelsReady, form]);
 
   const onSubmit = async (data: CreateConversationFormData) => {
     try {
@@ -102,14 +113,6 @@ export default function NewChatPage() {
     }
   };
 
-  // Preferred models saved in settings may not be in the built-in list
-  const availableModels = [
-    ...AI_MODELS,
-    ...[settings?.preferred_generator_model, settings?.preferred_evaluator_model]
-      .filter((m): m is string => !!m && !AI_MODELS.some((x) => x.value === m))
-      .filter((m, i, arr) => arr.indexOf(m) === i)
-      .map((m) => ({ value: m, label: m, provider: providerForModel(m) })),
-  ];
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -177,7 +180,16 @@ export default function NewChatPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              {!anyUsable && (
+                <div className="rounded-md border border-amber-300/60 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-200">
+                  This server has no AI provider key configured yet.{" "}
+                  <Link href="/settings/api-keys" className="font-medium underline underline-offset-2">
+                    Add your own API key
+                  </Link>{" "}
+                  to start generating.
+                </div>
+              )}
+              <div className="grid gap-4 sm:grid-cols-2">
                 <FormField
                   control={form.control}
                   name="generator_model"
@@ -187,7 +199,7 @@ export default function NewChatPage() {
                       <Select
                         onValueChange={(val) => {
                           field.onChange(val);
-                          form.setValue("generator_provider", providerForModel(val));
+                          form.setValue("generator_provider", providerOf(val));
                         }}
                         value={field.value}
                       >
@@ -197,9 +209,12 @@ export default function NewChatPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {availableModels.map((model) => (
-                            <SelectItem key={model.value} value={model.value}>
+                          {models.map((model) => (
+                            <SelectItem key={model.value} value={model.value} disabled={!model.usable}>
                               {model.label}
+                              {!model.usable && (
+                                <span className="ml-1 text-xs text-muted-foreground">· needs API key</span>
+                              )}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -217,7 +232,7 @@ export default function NewChatPage() {
                       <Select
                         onValueChange={(val) => {
                           field.onChange(val);
-                          form.setValue("evaluator_provider", providerForModel(val));
+                          form.setValue("evaluator_provider", providerOf(val));
                         }}
                         value={field.value}
                       >
@@ -227,9 +242,12 @@ export default function NewChatPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {availableModels.map((model) => (
-                            <SelectItem key={model.value} value={model.value}>
+                          {models.map((model) => (
+                            <SelectItem key={model.value} value={model.value} disabled={!model.usable}>
                               {model.label}
+                              {!model.usable && (
+                                <span className="ml-1 text-xs text-muted-foreground">· needs API key</span>
+                              )}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -240,7 +258,7 @@ export default function NewChatPage() {
                 />
               </div>
 
-              <div className="flex items-center gap-6">
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
                 <FormField
                   control={form.control}
                   name="search_enabled"
@@ -250,12 +268,15 @@ export default function NewChatPage() {
                         <Switch
                           checked={field.value}
                           onCheckedChange={field.onChange}
+                          disabled={!searchAvailable}
                         />
                       </FormControl>
                       <div>
                         <FormLabel>Web Search</FormLabel>
                         <FormDescription className="text-xs">
-                          Enable Google search for context
+                          {searchAvailable
+                            ? "Enable Google search for context"
+                            : "Not configured on this server"}
                         </FormDescription>
                       </div>
                     </FormItem>
@@ -335,7 +356,7 @@ export default function NewChatPage() {
                     )}
                   />
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
                     <FormField
                       control={form.control}
                       name="max_iterations"

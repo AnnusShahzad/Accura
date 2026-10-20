@@ -115,7 +115,7 @@ export default function AdminPromptsPage() {
         <div>
           <h1 className="text-2xl font-bold">System Prompts</h1>
           <p className="text-muted-foreground">
-            Manage system prompts for generator, evaluator, and critic agents
+            Manage system prompts for the generator, evaluator and re-prompt agents
           </p>
         </div>
         <Button onClick={openCreate}>

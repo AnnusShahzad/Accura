@@ -11,7 +11,7 @@ import {
   useSendFollowUpMessage,
 } from "@/hooks/use-chat";
 import { useSettings } from "@/hooks/use-settings";
-import { AI_MODELS } from "@/lib/constants";
+import { useModels } from "@/hooks/use-models";
 import { formatDate, formatNumber, cn } from "@/lib/utils";
 import {
   Card,
@@ -272,6 +272,7 @@ export default function ChatDetailPage({
   );
   const retry = useRetryConversation();
   const { data: settings } = useSettings();
+  const { models, providerOf, searchAvailable } = useModels();
   const renameConversation = useRenameConversation();
   const addAgent = useAddAgent();
   const sendFollowUp = useSendFollowUpMessage();
@@ -475,17 +476,19 @@ export default function ChatDetailPage({
                   value={newAgentModel}
                   onValueChange={(val) => {
                     setNewAgentModel(val);
-                    const model = AI_MODELS.find((m) => m.value === val);
-                    if (model) setNewAgentProvider(model.provider);
+                    setNewAgentProvider(providerOf(val));
                   }}
                 >
                   <SelectTrigger className="mt-1">
                     <SelectValue placeholder="Select model" />
                   </SelectTrigger>
                   <SelectContent>
-                    {AI_MODELS.map((model) => (
-                      <SelectItem key={model.value} value={model.value}>
+                    {models.map((model) => (
+                      <SelectItem key={model.value} value={model.value} disabled={!model.usable}>
                         {model.label}
+                        {!model.usable && (
+                          <span className="ml-1 text-xs text-muted-foreground">· needs API key</span>
+                        )}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -564,9 +567,18 @@ export default function ChatDetailPage({
         ) : (
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2 px-1">
-              <Switch checked={searchEnabled} onCheckedChange={setSearchEnabled} id="web-search-toggle" />
-              <label htmlFor="web-search-toggle" className="text-xs font-medium cursor-pointer flex items-center gap-1">
+              <Switch
+                checked={searchEnabled && searchAvailable}
+                onCheckedChange={setSearchEnabled}
+                id="web-search-toggle"
+                disabled={!searchAvailable}
+              />
+              <label
+                htmlFor="web-search-toggle"
+                className={cn("text-xs font-medium flex items-center gap-1", searchAvailable ? "cursor-pointer" : "text-muted-foreground")}
+              >
                 <Search className="h-3 w-3" /> Web Search
+                {!searchAvailable && <span className="font-normal">(not configured)</span>}
               </label>
             </div>
             <div className="flex items-end gap-2">

@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { settingsSchema, type SettingsFormData } from "@/lib/validations";
 import { useSettings, useUpdateSettings } from "@/hooks/use-settings";
-import { AI_MODELS } from "@/lib/constants";
+import { useModels } from "@/hooks/use-models";
 import {
   Card,
   CardContent,
@@ -40,6 +40,7 @@ import { useTheme } from "next-themes";
 export default function SettingsPage() {
   const { data: settings, isLoading } = useSettings();
   const { setTheme } = useTheme();
+  const { models } = useModels([settings?.preferred_generator_model, settings?.preferred_evaluator_model]);
   const updateSettings = useUpdateSettings();
 
   const form = useForm<SettingsFormData>({
@@ -51,7 +52,6 @@ export default function SettingsPage() {
       hide_evaluator_scoring: false,
       preferred_generator_model: "gpt-5.2",
       preferred_evaluator_model: "gpt-5.1",
-      preferred_critic_model: "gpt-5.1",
       dark_mode: false,
       search_enabled: false,
     },
@@ -66,7 +66,6 @@ export default function SettingsPage() {
       hide_evaluator_scoring: settings.hide_evaluator_scoring,
       preferred_generator_model: settings?.preferred_generator_model,
       preferred_evaluator_model: settings?.preferred_evaluator_model,
-      preferred_critic_model: settings?.preferred_critic_model,
       dark_mode: settings?.dark_mode,
       search_enabled: settings?.search_enabled,
     });
@@ -215,7 +214,7 @@ export default function SettingsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <FormField
                   control={form.control}
                   name="preferred_generator_model"
@@ -232,9 +231,12 @@ export default function SettingsPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {AI_MODELS.map((m) => (
-                            <SelectItem key={m.value} value={m.value}>
+                          {models.map((m) => (
+                            <SelectItem key={m.value} value={m.value} disabled={!m.usable}>
                               {m.label}
+                              {!m.usable && (
+                                <span className="ml-1 text-xs text-muted-foreground">· needs API key</span>
+                              )}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -258,35 +260,12 @@ export default function SettingsPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {AI_MODELS.map((m) => (
-                            <SelectItem key={m.value} value={m.value}>
+                          {models.map((m) => (
+                            <SelectItem key={m.value} value={m.value} disabled={!m.usable}>
                               {m.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="preferred_critic_model"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Critic</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {AI_MODELS.map((m) => (
-                            <SelectItem key={m.value} value={m.value}>
-                              {m.label}
+                              {!m.usable && (
+                                <span className="ml-1 text-xs text-muted-foreground">· needs API key</span>
+                              )}
                             </SelectItem>
                           ))}
                         </SelectContent>

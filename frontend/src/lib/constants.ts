@@ -31,10 +31,6 @@ export const AI_MODELS = [
   { value: "openai/gpt-oss-20b", label: "GPT-OSS 20B (custom endpoint)", provider: "custom" },
 ] as const;
 
-export function providerForModel(model: string | undefined): string {
-  return AI_MODELS.find((m) => m.value === model)?.provider ?? "openai";
-}
-
 // ─── AI Providers ───
 export const AI_PROVIDERS = [
   { value: "openai", label: "OpenAI" },
@@ -92,5 +88,4 @@ export const DEFAULTS = {
   timeoutSeconds: 120,
   preferredGeneratorModel: "gpt-5.2",
   preferredEvaluatorModel: "gpt-5.1",
-  preferredCriticModel: "gpt-5.1",
 } as const;

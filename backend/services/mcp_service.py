@@ -27,6 +27,7 @@ import httpx
 from models.mcp_server import MCPServer
 from utils.crypto import decrypt
 from utils.exceptions import MCPServerError
+from utils.url_guard import UnsafeURLError, ensure_public_url, private_urls_allowed
 
 logger = logging.getLogger("accura.mcp_service")
 
@@ -198,7 +199,13 @@ class _LegacySSESession(_Session):
         while self.endpoint is None:
             event, data = await self._next_event()
             if event == "endpoint":
-                self.endpoint = urljoin(self.server["url"], data.strip())
+                endpoint = urljoin(self.server["url"], data.strip())
+                # The server chooses where we POST; hold it to the same rule
+                try:
+                    await ensure_public_url(endpoint, what="MCP endpoint")
+                except UnsafeURLError as exc:
+                    raise MCPServerError(str(exc))
+                self.endpoint = endpoint
 
     async def _post(self, payload: dict) -> None:
         resp = await self.client.post(
@@ -236,7 +243,13 @@ async def _open_session(server: dict, timeout: int) -> AsyncIterator[_Session]:
             "expose the server over HTTP (Streamable HTTP or SSE) instead"
         )
     try:
-        async with _client_factory(timeout=timeout, follow_redirects=True) as client:
+        await ensure_public_url(server["url"], what="MCP server URL")
+    except UnsafeURLError as exc:
+        raise MCPServerError(str(exc))
+    try:
+        # A redirect could bounce a vetted public URL to a private one
+        follow = private_urls_allowed()
+        async with _client_factory(timeout=timeout, follow_redirects=follow) as client:
             if transport == "sse":
                 async with client.stream(
                     "GET",

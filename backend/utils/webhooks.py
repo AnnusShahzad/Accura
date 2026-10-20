@@ -8,6 +8,8 @@ import logging
 
 import httpx
 
+from utils.url_guard import UnsafeURLError, ensure_public_url
+
 logger = logging.getLogger("accura.webhooks")
 
 
@@ -18,6 +20,7 @@ async def send_slack_notification(webhook_url: str, text: str, *, blocks: list |
         payload["blocks"] = blocks
 
     try:
+        await ensure_public_url(webhook_url, what="Slack webhook URL")
         async with httpx.AsyncClient(timeout=10) as client:
             resp = await client.post(webhook_url, json=payload)
             resp.raise_for_status()
@@ -39,6 +42,7 @@ async def send_teams_notification(webhook_url: str, title: str, text: str) -> bo
     }
 
     try:
+        await ensure_public_url(webhook_url, what="Teams webhook URL")
         async with httpx.AsyncClient(timeout=10) as client:
             resp = await client.post(webhook_url, json=payload)
             resp.raise_for_status()

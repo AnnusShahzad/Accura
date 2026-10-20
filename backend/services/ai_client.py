@@ -15,6 +15,7 @@ from config import settings
 from models.api_key import UserAPIKey
 from utils.crypto import decrypt
 from utils.exceptions import AIProviderError
+from utils.url_guard import UnsafeURLError, ensure_public_url
 
 logger = logging.getLogger("accura.ai_client")
 
@@ -58,6 +59,12 @@ async def _resolve_api_key(user_id: str | None, provider: str) -> tuple[str, str
                 raise AIProviderError(
                     f"Your saved {provider} API key could not be decrypted. Please re-add it."
                 )
+            if user_key["base_url"]:
+                # A user-chosen endpoint receives our requests; vet it
+                try:
+                    await ensure_public_url(user_key["base_url"], what="API base URL")
+                except UnsafeURLError as exc:
+                    raise AIProviderError(str(exc))
             return key, user_key["base_url"] or default_url
 
     # 2) Fall back to platform key from config

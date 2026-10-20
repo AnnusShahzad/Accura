@@ -16,6 +16,7 @@ from middleware.auth_middleware import require_auth
 from models.settings import UserSettings
 from schemas.settings import UpdateSettingsRequest
 from utils.responses import error, success, validation_error
+from utils.url_guard import UnsafeURLError, ensure_public_url
 
 bp = Blueprint("settings", url_prefix="/api/v1/settings")
 
@@ -49,6 +50,12 @@ async def update_settings(request: Request):
         body = UpdateSettingsRequest(**(request.json or {}))
     except Exception as exc:
         return validation_error(exc)
+    for url, what in ((body.slack_webhook_url, "Slack webhook URL"), (body.teams_webhook_url, "Teams webhook URL"),):
+        if url:
+            try:
+                await ensure_public_url(url, what=what)
+            except UnsafeURLError as exc:
+                return error(str(exc), status=422)
 
     user_id = str(request.ctx.user["id"])
     updates = body.model_dump(exclude_none=True)

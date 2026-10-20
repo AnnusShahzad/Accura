@@ -25,7 +25,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { GuestAccess } from "@/components/auth/guest-access";
+import { usePublicConfig } from "@/hooks/use-public-config";
 import {
+  Lock,
   Loader2,
   Eye,
   EyeOff,
@@ -35,7 +38,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 
-export default function RegisterPage() {
+function RegisterForm() {
   const { register: registerUser, isRegistering } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -341,4 +344,37 @@ export default function RegisterPage() {
       </CardFooter>
     </Card>
   );
+}
+
+
+export default function RegisterPage() {
+  const { data: config } = usePublicConfig();
+
+  if (config && !config.registration_enabled) {
+    return (
+      <Card>
+        <CardHeader className="space-y-1">
+          <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+            <Lock className="h-5 w-5 text-muted-foreground" />
+          </div>
+          <CardTitle className="text-2xl font-bold">Registration is closed</CardTitle>
+          <CardDescription>
+            New accounts can&apos;t be created on this server right now.
+            {config.guest.enabled && " You can still try everything with a guest account."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <GuestAccess variant="default" />
+          <p className="text-center text-sm text-muted-foreground">
+            Already have an account?{" "}
+            <Link href="/login" className="font-medium text-primary hover:underline">
+              Sign in
+            </Link>
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return <RegisterForm />;
 }

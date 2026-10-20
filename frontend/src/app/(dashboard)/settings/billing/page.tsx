@@ -214,6 +214,12 @@ function BillingContent() {
         </p>
       </div>
 
+      {user?.is_guest && (
+        <div className="rounded-lg border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-200">
+          Guest accounts stay on the Basic plan. Plans can be changed from a full account.
+        </div>
+      )}
+
       {/* Current Plan */}
       <Card className="border-primary/50 shadow-sm bg-primary/5">
         <CardHeader>
@@ -257,7 +263,7 @@ function BillingContent() {
                 )}
               </div>
               <div className="flex flex-wrap gap-2">
-                {subscription?.id && (
+                {subscription?.id && !user?.is_guest && (
                   <Button variant="outline" onClick={() => setConfirmCancel(true)}>
                     Cancel Plan
                   </Button>
@@ -333,7 +339,7 @@ function BillingContent() {
                   <Button
                     variant={isCurrent ? "outline" : "default"}
                     className="w-full"
-                    disabled={isCurrent || subscribe.isPending}
+                    disabled={isCurrent || subscribe.isPending || !!user?.is_guest}
                     onClick={() => handleUpgradeClick(plan)}
                   >
                     {isCurrent

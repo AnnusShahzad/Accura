@@ -3,6 +3,7 @@
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { Header } from "@/components/layout/header";
+import { GuestBanner } from "@/components/layout/guest-banner";
 import { useAuthStore } from "@/stores/auth-store";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -37,6 +38,7 @@ export default function DashboardLayout({
       <AppSidebar />
       <SidebarInset>
         <Header />
+        <GuestBanner />
         <main className="flex-1 overflow-y-auto p-4 lg:p-6">{children}</main>
       </SidebarInset>
     </SidebarProvider>

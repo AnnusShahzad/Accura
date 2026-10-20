@@ -30,8 +30,8 @@ export function GuestAccess({ variant = "outline" }: { variant?: "outline" | "de
         Continue as guest
       </Button>
       <p className="text-center text-xs text-muted-foreground">
-        No sign-up needed. A guest session and everything in it is deleted after{" "}
-        {hours === 1 ? "1 hour" : `${hours} hours`}.
+        No sign-up and no personal details. The guest account and everything in it is
+        permanently deleted after {hours === 1 ? "1 hour" : `${hours} hours`}.
       </p>
     </div>
   );

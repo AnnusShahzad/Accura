@@ -22,8 +22,8 @@ export function GuestBanner() {
       <p>
         <span className="font-medium">Guest session.</span>{" "}
         {when
-          ? `This account and everything in it will be deleted ${when}.`
-          : "This account and everything in it will be deleted automatically."}
+          ? `On ${when} this account is permanently deleted with all its chats, keys and settings. Nothing is kept.`
+          : "This account is permanently deleted with all its chats, keys and settings after a while. Nothing is kept."}
       </p>
     </div>
   );

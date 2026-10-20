@@ -67,6 +67,8 @@ auth:
     requests_per_minute: 5
     requests_per_day: 30
     max_iterations: 3
+    # New guest sessions per hour across the whole site (on top of 5 per IP)
+    signups_per_hour: 60
   # Created (or promoted) on startup when both are set. Useful on hosts
   # without shell access, e.g. Render's free tier.
   bootstrap_admin:

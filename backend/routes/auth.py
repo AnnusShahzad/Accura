@@ -246,6 +246,9 @@ async def verify_email_change_route(request: Request):
 _GUEST_WINDOW_SECONDS = 3600
 _GUESTS_PER_WINDOW = 5
 _guest_signins: dict[str, deque] = defaultdict(deque)
+# X-Forwarded-For can be forged, so the per-IP limit alone can be dodged;
+# a site-wide hourly cap bounds the total no matter what clients claim.
+_all_guest_signins: deque = deque()
 
 
 def _client_ip(request: Request) -> str:
@@ -267,6 +270,16 @@ async def guest_login(request: Request):
             status=429,
             retry_after_seconds=_GUEST_WINDOW_SECONDS,
         )
+    while _all_guest_signins and now - _all_guest_signins[0] > _GUEST_WINDOW_SECONDS:
+        _all_guest_signins.popleft()
+    from config import settings
+
+    if len(_all_guest_signins) >= int(settings.get("auth.guest.signups_per_hour", 60)):
+        return error(
+            "Guest access is very busy right now. Please try again in a little while.",
+            status=429,
+            retry_after_seconds=600,
+        )
 
     try:
         tokens = await create_guest()
@@ -274,4 +287,5 @@ async def guest_login(request: Request):
         return error(exc.message, status=exc.status_code)
 
     recent.append(now)
+    _all_guest_signins.append(now)
     return success(tokens, message="Guest session started", status=201)

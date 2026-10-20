@@ -25,6 +25,7 @@ from tests.test_chat import _wait_done
 def guests_on(monkeypatch):
     monkeypatch.setitem(settings._data["auth"]["guest"], "enabled", True)
     auth_routes._guest_signins.clear()
+    auth_routes._all_guest_signins.clear()
 
 
 async def _guest(client, ip="203.0.113.7"):
@@ -160,3 +161,9 @@ async def test_interrupted_and_temporary_cleanup(test_client, auth_headers, monk
     assert await purge_temporary_conversations() >= 1
     _, r = await test_client.get(f"/api/v1/chat/{temp_id}", headers=auth_headers)
     assert r.status == 404
+
+
+async def test_site_wide_guest_cap_ignores_forged_ips(test_client, guests_on, monkeypatch):
+    monkeypatch.setitem(settings._data["auth"]["guest"], "signups_per_hour", 3)
+    statuses = [(await _guest(test_client, ip=f"203.0.113.{i}")).status for i in range(5)]
+    assert statuses == [201, 201, 201, 429, 429]

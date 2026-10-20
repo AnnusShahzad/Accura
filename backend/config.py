@@ -109,6 +109,7 @@ def _env_overrides() -> dict:
         ("GUEST_REQUESTS_PER_MINUTE", "auth.guest.requests_per_minute", int),
         ("GUEST_REQUESTS_PER_DAY", "auth.guest.requests_per_day", int),
         ("GUEST_MAX_ITERATIONS", "auth.guest.max_iterations", int),
+        ("GUEST_SIGNUPS_PER_HOUR", "auth.guest.signups_per_hour", int),
         ("ADMIN_EMAIL", "auth.bootstrap_admin.email", str),
         ("ADMIN_PASSWORD", "auth.bootstrap_admin.password", str),
         ("ADMIN_USERNAME", "auth.bootstrap_admin.username", str),
